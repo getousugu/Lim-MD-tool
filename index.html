@@ -1,0 +1,1629 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LCB — 鏡ダンジョン編成ツール</title>
+  <style>
+    /* ====== RESET ====== */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html {
+      font-size: 15px;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    /* ====== TOKENS ====== */
+    :root {
+      --c-bg:       #0a0a0c;
+      --c-surface:  #111114;
+      --c-raise:    #18181d;
+      --c-line:     #282830;
+      --c-muted:    #4a4a5a;
+      --c-sub:      #8a8a9e;
+      --c-text:     #e2e2ec;
+      --c-bright:   #ffffff;
+      --c-accent:   #8a7ff5;
+      --c-accent-rgb: 138, 127, 245;
+      --c-green:    #40d685;
+      --c-amber:    #f5b850;
+      --c-red:      #f06070;
+      --c-purple:   #c070f0;
+      --radius-sm:  4px;
+      --radius-md:  6px;
+      --radius-lg:  8px;
+      
+      --kw-火傷: #ff5555; --kw-火傷-bg: rgba(255,85,85,.12);
+      --kw-出血: #ff4585; --kw-出血-bg: rgba(255,69,133,.12);
+      --kw-振動: #a070ff; --kw-振動-bg: rgba(160,112,255,.12);
+      --kw-破裂: #f08030; --kw-破裂-bg: rgba(240,128,48,.12);
+      --kw-沈潜: #45a0ff; --kw-沈潜-bg: rgba(69,160,255,.12);
+      --kw-呼吸: #35d085; --kw-呼吸-bg: rgba(53,208,133,.12);
+      --kw-充電: #f5d020; --kw-充電-bg: rgba(245,208,32,.12);
+      
+      --shadow-sm: 0 4px 12px rgba(0,0,0,0.3);
+      --shadow-md: 0 8px 32px rgba(0,0,0,0.5);
+      
+      --svg-arrow: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%238a8a9e' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    }
+
+    body.lm {
+      --c-bg:      #f4f4fa;
+      --c-surface: #ffffff;
+      --c-raise:   #fcfcff;
+      --c-line:    #e0e0f0;
+      --c-muted:   #b0b0cc;
+      --c-sub:     #6a6a8a;
+      --c-text:    #1a1a2e;
+      --c-bright:  #000000;
+      --c-accent:  #5a4adb;
+      --c-accent-rgb: 90, 74, 219;
+      --c-green:   #1a7a4a;
+      --c-amber:   #a06510;
+      --c-red:     #c03040;
+      --c-purple:  #8040c0;
+      
+      --shadow-sm: 0 4px 12px rgba(0,0,0,0.05);
+      --shadow-md: 0 12px 36px rgba(0,0,0,0.1);
+      --svg-arrow: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%236a6a8a' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    }
+
+    body {
+      background: var(--c-bg);
+      color: var(--c-text);
+      font-family: 'Inter', -apple-system, system-ui, sans-serif;
+      line-height: 1.6;
+      min-height: 100vh;
+      transition: background .4s ease, color .4s ease;
+    }
+
+    .topbar {
+      display: flex; align-items: center; padding: 0 24px; height: 60px;
+      border-bottom: 1px solid var(--c-line); background: var(--c-surface);
+      position: sticky; top: 0; z-index: 100; box-shadow: var(--shadow-sm);
+    }
+    .topbar-logo {
+      font-size: 16px; font-weight: 900; color: var(--c-bright);
+      letter-spacing: -0.02em; margin-right: 48px; white-space: nowrap;
+    }
+    .topbar-logo span { color: var(--c-accent); text-shadow: 0 0 20px rgba(var(--c-accent-rgb), 0.5); }
+    .nav-tabs { display: flex; gap: 4px; height: 100%; }
+    .nav-tab {
+      height: 100%; padding: 0 24px; font-size: 14px; font-weight: 700;
+      color: var(--c-sub); cursor: pointer; border: none; background: none;
+      position: relative; transition: all .3s cubic-bezier(0.4, 0, 0.2, 1);
+      display: flex; align-items: center;
+    }
+    .nav-tab:hover { color: var(--c-text); }
+    .nav-tab.active { color: var(--c-accent); }
+    .nav-tab.active::after {
+      content: ''; position: absolute; bottom: 0; left: 15%; width: 70%; height: 4px;
+      background: var(--c-accent); border-radius: 4px 4px 0 0;
+      box-shadow: 0 0 16px rgba(var(--c-accent-rgb), 0.5);
+    }
+
+    .topbar-right { margin-left: auto; }
+    .topbar-home {
+      display: flex; align-items: center; justify-content: center;
+      width: 34px; height: 34px; border-radius: var(--radius-md);
+      font-size: 18px; text-decoration: none;
+      transition: all .2s ease; margin-right: 12px; flex-shrink: 0;
+    }
+    .topbar-home:hover { background: var(--c-raise); transform: scale(1.1); }
+    .theme-btn {
+      height: 34px; padding: 0 18px; font-size: 13px; font-weight: 700;
+      border: 2px solid var(--c-line); border-radius: 17px;
+      background: var(--c-raise); color: var(--c-sub); cursor: pointer;
+      transition: all .2s ease;
+    }
+    .theme-btn:hover { border-color: var(--c-accent); color: var(--c-accent); background: var(--c-surface); }
+
+    .f-select, .f-input, .db-search, .db-filter, .setting-select {
+      appearance: none; -webkit-appearance: none;
+      height: 38px; padding: 0 12px;
+      border: 2px solid var(--c-line); border-radius: var(--radius-md);
+      background: var(--c-raise); color: var(--c-text);
+      font-size: 14px; font-weight: 600; outline: none; transition: all .2s ease;
+    }
+    .f-select {
+      padding-right: 42px;
+      background-image: var(--svg-arrow);
+      background-repeat: no-repeat;
+      background-position: right 14px center;
+      background-size: 18px;
+      cursor: pointer;
+    }
+    .f-select:focus, .f-input:focus { 
+      border-color: var(--c-accent); background: var(--c-surface);
+      box-shadow: 0 0 0 4px rgba(var(--c-accent-rgb), 0.12);
+    }
+
+    /* ====== 完全網羅カード ====== */
+    .complete-card {
+      background: var(--c-surface); border: 2px solid var(--c-line);
+      border-radius: var(--radius-lg); padding: 14px 16px;
+      box-shadow: var(--shadow-sm); transition: all .2s ease;
+    }
+    .complete-card.possible { cursor: pointer; }
+    .complete-card.possible:hover { border-color: var(--c-accent); transform: translateY(-2px); box-shadow: var(--shadow-md); }
+    .complete-card.impossible { opacity: 0.45; }
+    .cc-kws { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 8px; }
+    .cc-status { font-size: 13px; }
+
+    .sec { margin-bottom: 32px; }
+    .sec-label {
+      font-size: 12px; font-weight: 900; color: var(--c-sub);
+      text-transform: uppercase; letter-spacing: 0.15em; margin-bottom: 12px; display: block;
+    }
+    .sec-body {
+      background: var(--c-surface); border: 2px solid var(--c-line);
+      border-radius: var(--radius-lg); overflow: hidden; box-shadow: var(--shadow-sm);
+    }
+    
+    /* ====== PAGE & ANIMATION ====== */
+    .page { display: none; padding: 24px 16px; max-width: 900px; margin: 0 auto; }
+    .page.active { display: block; animation: slideUp .4s cubic-bezier(0.23, 1, 0.32, 1); }
+    @keyframes slideUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+    /* ====== TOGGLE (SWITCH) ====== */
+    .sw { width: 44px; height: 24px; position: relative; display: inline-block; }
+    .sw input { opacity: 0; width: 0; height: 0; }
+    .sw-track {
+      position: absolute; cursor: pointer; inset: 0;
+      background-color: var(--c-line); border-radius: 24px; transition: .3s;
+    }
+    .sw-track:before {
+      content: ""; position: absolute; height: 18px; width: 18px; left: 3px; bottom: 3px;
+      background-color: white; border-radius: 50%; transition: .3s cubic-bezier(0.18, 0.89, 0.35, 1.15);
+      box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    }
+    .sw input:checked + .sw-track { background-color: var(--c-accent); }
+    .sw input:checked + .sw-track:before { transform: translateX(20px); }
+
+    .run-btn {
+      width: 100%; height: 48px; border: none; border-radius: var(--radius-lg);
+      background: linear-gradient(135deg, var(--c-accent), #9b8ff5);
+      color: #fff; font-size: 15px; font-weight: 800; letter-spacing: 0.05em;
+      cursor: pointer; position: relative; overflow: hidden;
+      transition: all .3s cubic-bezier(0.23, 1, 0.32, 1);
+      box-shadow: 0 6px 20px rgba(var(--c-accent-rgb), 0.3);
+    }
+    .run-btn::after {
+      content: ''; position: absolute; top: 0; left: -100%; width: 100%; height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.25), transparent);
+      transition: 0.6s;
+    }
+    .run-btn:hover { transform: translateY(-3px); box-shadow: 0 15px 40px rgba(var(--c-accent-rgb), 0.5); }
+    .run-btn:hover::after { left: 100%; }
+    .run-btn:active { transform: translateY(-1px); }
+    .run-btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; box-shadow: none; }
+
+    .kw-row { display: flex; flex-wrap: wrap; gap: 8px; padding: 16px; }
+    .kw-chip, .kw-check-btn {
+      height: 28px; padding: 0 14px; border-radius: var(--radius-md);
+      border: 1px solid var(--c-line); background: var(--c-raise);
+      color: var(--c-sub); font-size: 12px; font-weight: 600;
+      cursor: pointer; user-select: none; white-space: nowrap; flex-shrink: 0;
+      transition: all .2s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .kw-chip:hover, .kw-check-btn:hover { border-color: var(--c-muted); color: var(--c-text); transform: translateY(-1px); }
+    .kw-chip.on, .kw-check-btn.on { 
+      border-color: var(--kw-col); background: var(--kw-col-bg); 
+      color: var(--kw-col); box-shadow: 0 0 12px var(--kw-col-bg); 
+    }
+
+    .icon-btn, .btn-ghost, .btn-primary, .btn-danger {
+      height: 38px; padding: 0 16px; font-size: 13px; font-weight: 700;
+      border: 1px solid var(--c-line); border-radius: var(--radius-md);
+      background: var(--c-raise); color: var(--c-sub); cursor: pointer;
+      transition: all .2s; outline: none; white-space: nowrap;
+    }
+    .icon-btn:hover, .btn-ghost:hover { border-color: var(--c-accent); color: var(--c-accent); background: rgba(var(--c-accent-rgb), 0.08); }
+    .btn-danger { color: var(--c-red); background: rgba(240,96,112,0.05); }
+    .btn-danger:hover { background: rgba(240,96,112,0.12); border-color: var(--c-red); }
+    .btn-primary { background: var(--c-green); color: #fff; border-color: transparent; }
+    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(64,214,133,0.3); background: #35c070; border-color: transparent; color: #fff;}
+
+    /* ====== ANCHOR & IO ====== */
+    .anchor-row, .io-row { display: flex; gap: 12px; align-items: center; padding: 16px 20px 8px; flex-wrap: wrap; }
+    .anchor-hint, .info-note { font-size: 11px; color: var(--c-sub); padding: 0 20px 16px; line-height: 1.6; }
+
+    .team-block {
+      background: var(--c-surface); border: 2px solid var(--c-line);
+      border-radius: var(--radius-lg); margin-bottom: 20px; overflow: hidden;
+      box-shadow: var(--shadow-sm); transition: all .3s cubic-bezier(0.23, 1, 0.32, 1);
+    }
+    .team-block:hover { transform: translateY(-3px); box-shadow: var(--shadow-md); border-color: var(--c-muted); }
+    .team-block.jackpot { border: 3px solid var(--c-amber); box-shadow: 0 12px 40px rgba(245,184,80,0.25); }
+
+    .team-head {
+      display: flex; align-items: center; gap: 16px; padding: 18px 24px; cursor: pointer;
+      background: linear-gradient(to right, var(--c-surface), var(--c-raise));
+    }
+    .team-idx { font-size: 12px; font-weight: 900; color: var(--c-sub); min-width: 60px; }
+    .team-chips { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; flex: 1; }
+    .t-chip {
+      height: 24px; padding: 0 10px; border-radius: var(--radius-sm); font-size: 11px; font-weight: 700;
+      background: var(--kw-col-bg); color: var(--kw-col); display: flex; align-items: center;
+      white-space: nowrap; flex-shrink: 0;
+    }
+    .t-chip.ok { border: 2px solid var(--kw-col); box-shadow: 0 0 12px var(--kw-col-bg); }
+
+    /* ====== RESULTS ACCORDION & ROWS ====== */
+    .team-caret { color: var(--c-muted); transition: transform .3s; }
+    .team-block.open .team-caret { transform: rotate(180deg); color: var(--c-accent); }
+    .team-body { display: none; background: var(--c-surface); }
+    .team-block.open .team-body { display: block; animation: fadeIn .3s; }
+    
+    .p-row { display: flex; align-items: center; gap: 16px; padding: 10px 20px; border-bottom: 1px solid var(--c-line); transition: background .1s; }
+    .p-row:last-child { border-bottom: none; }
+    .p-row:hover { background: rgba(var(--c-accent-rgb), 0.04); }
+    .p-prisoner { width: 85px; font-size: 12px; font-weight: 800; color: var(--c-sub); flex-shrink: 0; }
+    .p-name { flex: 1; font-size: 14px; font-weight: 700; color: var(--c-text); }
+    .p-name .w-tag { padding: 2px 6px; font-size: 9px; font-weight: 900; background: rgba(192,112,240,0.15); color: var(--c-purple); border-radius: 4px; margin-left: 8px; vertical-align: middle; }
+    .p-stars { font-size: 14px; letter-spacing: -2px; margin-right: 12px; flex-shrink: 0; }
+    .s3 { color: var(--c-amber); text-shadow: 0 0 10px rgba(245,184,80,0.4); }
+    .s2 { color: var(--c-sub); }
+    .s1 { color: var(--c-muted); opacity: 0.6; }
+    .p-kws { display: flex; gap: 4px; flex-wrap: wrap; }
+    .p-kw { height: 20px; padding: 0 8px; border-radius: 10px; font-size: 11px; font-weight: 600; background: var(--kw-col-bg); color: var(--kw-col); border: 1px solid transparent; }
+    .p-kw.matched { border-color: var(--kw-col); font-weight: 800; transform: scale(1.05); }
+
+    /* ====== SETTINGS OVERRIDES ====== */
+    .settings-toggle-btn {
+      background: none; border: none; color: var(--c-sub); font-size: 12px; font-weight: 700;
+      cursor: pointer; padding: 4px 8px; border-radius: var(--radius-sm); transition: .2s;
+    }
+    .settings-toggle-btn:hover { color: var(--c-text); background: var(--c-raise); }
+    .setting-row { display: flex; align-items: center; gap: 16px; padding: 12px 16px; border-bottom: 1px solid var(--c-line); }
+    .setting-label { flex: 1; font-size: 13px; font-weight: 600; color: var(--c-text); }
+    .setting-desc { font-size: 11px; color: var(--c-sub); margin-top: 2px; }
+
+    /* ====== FORMS ====== */
+    .form-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; padding: 24px; }
+    @media(max-width:600px) { .form-grid { grid-template-columns: 1fr; } }
+    .f-group { display: flex; flex-direction: column; gap: 8px; }
+    .kw-checks { display: flex; flex-wrap: wrap; gap: 6px; }
+    .form-footer { padding: 0 24px 24px; display: flex; gap: 12px; }
+
+    /* ====== DATABASE & TABLES ====== */
+    .db-toolbar { display: flex; gap: 12px; padding: 16px 20px; flex-wrap: wrap; background: var(--c-surface); border-bottom: 1px solid var(--c-line); }
+    .db-search { flex: 1; min-width: 200px; }
+    .db-wrap { max-height: 500px; overflow-y: auto; }
+    table { width: 100%; border-collapse: collapse; }
+    thead th { background: var(--c-raise); padding: 12px 16px; text-align: left; color: var(--c-sub); font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em; border-bottom: 1px solid var(--c-line); position: sticky; top: 0; z-index: 10; }
+    tbody td { padding: 12px 16px; font-size: 14px; border-bottom: 1px solid var(--c-line); }
+    tbody tr:hover { background: rgba(var(--c-accent-rgb), 0.03); }
+    .db-footer { padding: 16px 20px; border-top: 1px solid var(--c-line); display: flex; align-items: center; gap: 12px; }
+
+    .tbl-edit, .tbl-del {
+      background: none; border: 1px solid var(--c-line); border-radius: var(--radius-sm);
+      padding: 4px 10px; font-size: 11px; font-weight: 700; color: var(--c-sub);
+      cursor: pointer; transition: all .2s; margin-right: 4px; outline: none;
+    }
+    .tbl-edit:hover { border-color: var(--c-accent); color: var(--c-accent); background: rgba(var(--c-accent-rgb), 0.1); }
+    .tbl-del:hover { border-color: var(--c-red); color: var(--c-red); background: rgba(240,96,112,0.1); }
+
+    /* ====== DB & OTHERS ====== */
+    .db-search, .db-filter { height: 40px; margin-bottom: 0; }
+    .badge { font-size: 10px; font-weight: 900; padding: 3px 10px; border-radius: 6px; margin-left: 6px; letter-spacing: 0.02em; }
+    .badge-w { background: rgba(192,112,240,0.15); color: var(--c-purple); }
+    .badge-custom { background: rgba(64,214,133,0.15); color: var(--c-green); }
+    .badge-edited { background: rgba(245,184,80,0.15); color: var(--c-amber); }
+
+    .modal-overlay {
+      display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7);
+      z-index: 1000; align-items: center; justify-content: center; padding: 24px;
+      backdrop-filter: blur(8px);
+    }
+    .modal-overlay.open { display: flex; animation: slideUp .3s ease-out; }
+    .modal {
+      background: var(--c-surface); border: 2px solid var(--c-line);
+      border-radius: var(--radius-lg); padding: 32px;
+      width: 100%; max-width: 500px; max-height: 90vh; overflow-y: auto;
+      box-shadow: 0 30px 60px rgba(0,0,0,0.6);
+    }
+    @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+  </style>
+</head>
+
+<body>
+
+  <!-- TOPBAR -->
+  <div class="topbar">
+    <a href="index.html" class="topbar-home" title="ツール一覧へ戻る">🏠</a>
+    <div class="topbar-logo"><span>LCB</span> 編成ツール</div>
+    <div class="nav-tabs">
+      <button class="nav-tab active" onclick="switchTab('search')">編成検索</button>
+      <button class="nav-tab" onclick="switchTab('complete'); runComplete()">完全網羅</button>
+      <button class="nav-tab" onclick="switchTab('add')">人格追加</button>
+      <button class="nav-tab" onclick="switchTab('db'); renderDB()">データベース</button>
+    </div>
+    <div class="topbar-right">
+      <button class="theme-btn" id="themeBtn" onclick="toggleTheme()">ライト</button>
+    </div>
+  </div>
+
+  <!-- ========== 検索ページ ========== -->
+  <div class="page active" id="page-search">
+
+    <!-- KW選択 -->
+    <div class="sec">
+      <div class="sec-head"><span class="sec-label">キーワード</span></div>
+      <div class="sec-body">
+        <div class="kw-row" id="kwGrid"></div>
+      </div>
+    </div>
+
+    <!-- アンカー -->
+    <div class="sec">
+      <div class="sec-head">
+        <span class="sec-label">固定/除外枠（アンカー）</span>
+        <button class="settings-toggle-btn" onclick="toggleAnchor(this)">▲ 折りたたむ</button>
+      </div>
+      <div class="sec-body" id="anchorBody">
+        <div class="anchor-row">
+          <span style="font-size: 11px; font-weight: 800; color: var(--c-accent); width: 60px;">枠 1</span>
+          <select id="anchorPrisonerSelect1" class="f-select" style="flex:0 0 110px" onchange="updateAnchorPersonaList(1)">
+            <option value="">-- 囚人 --</option>
+          </select>
+          <select id="anchorPersonaSelect1" class="f-select" style="flex: 1;">
+            <option value="">-- 人格を選択 --</option>
+          </select>
+          <button class="icon-btn" onclick="resetAnchor(1)">解除</button>
+        </div>
+        <div class="anchor-row" style="border-top: 1px solid var(--c-line);">
+          <span style="font-size: 11px; font-weight: 800; color: var(--c-accent); width: 60px;">枠 2</span>
+          <select id="anchorPrisonerSelect2" class="f-select" style="flex:0 0 110px" onchange="updateAnchorPersonaList(2)">
+            <option value="">-- 囚人 --</option>
+          </select>
+          <select id="anchorPersonaSelect2" class="f-select" style="flex: 1;">
+            <option value="">-- 人格を選択 --</option>
+          </select>
+          <button class="icon-btn" onclick="resetAnchor(2)">解除</button>
+        </div>
+        <div class="anchor-row" style="border-top: 1px solid var(--c-line);">
+          <span style="font-size: 11px; font-weight: 800; color: var(--c-accent); width: 60px;">枠 3</span>
+          <select id="anchorPrisonerSelect3" class="f-select" style="flex:0 0 110px" onchange="updateAnchorPersonaList(3)">
+            <option value="">-- 囚人 --</option>
+          </select>
+          <select id="anchorPersonaSelect3" class="f-select" style="flex: 1;">
+            <option value="">-- 人格を選択 --</option>
+          </select>
+          <button class="icon-btn" onclick="resetAnchor(3)">解除</button>
+        </div>
+        <div class="anchor-row" style="border-top: 1px dashed var(--c-line); background: rgba(240,96,112,0.03);">
+          <span style="font-size: 11px; font-weight: 800; color: var(--c-red); width: 60px;">除外 1</span>
+          <select id="antiAnchorPrisonerSelect1" class="f-select" style="flex:0 0 110px" onchange="updateAnchorPersonaList('Anti1')">
+            <option value="">-- 囚人 --</option>
+          </select>
+          <select id="antiAnchorPersonaSelect1" class="f-select" style="flex: 1;">
+            <option value="">-- 人格を特定しない（囚人自体を除外） --</option>
+          </select>
+          <button class="icon-btn" style="color:var(--c-red);border-color:var(--c-red);" onclick="resetAnchor('Anti1')">解除</button>
+        </div>
+        <div class="anchor-row" style="border-top: 1px dashed var(--c-line); background: rgba(240,96,112,0.03);">
+          <span style="font-size: 11px; font-weight: 800; color: var(--c-red); width: 60px;">除外 2</span>
+          <select id="antiAnchorPrisonerSelect2" class="f-select" style="flex:0 0 110px" onchange="updateAnchorPersonaList('Anti2')">
+            <option value="">-- 囚人 --</option>
+          </select>
+          <select id="antiAnchorPersonaSelect2" class="f-select" style="flex: 1;">
+            <option value="">-- 人格を特定しない（囚人自体を除外） --</option>
+          </select>
+          <button class="icon-btn" style="color:var(--c-red);border-color:var(--c-red);" onclick="resetAnchor('Anti2')">解除</button>
+        </div>
+        <div class="anchor-hint" style="border-top: 1px solid var(--c-line); padding-top: 16px;">💡 枠1〜3で指定した人格は必ず編成されます。除外枠を利用すると、特定の囚人または特定の人格を編成候補から取り除けます。KW未選択時はアンカー枠の人格がもつKWを目標として検索します。</div>
+      </div>
+    </div>
+
+    <!-- 設定 -->
+    <div class="sec">
+      <div class="sec-head">
+        <span class="sec-label">検索設定</span>
+        <button class="settings-toggle-btn" onclick="toggleSettings(this)">▲ 折りたたむ</button>
+      </div>
+      <div class="sec-body" id="settingsBody">
+        <div class="setting-row">
+          <div class="setting-label">
+            複数KW満足を優先
+            <div class="setting-desc">1KW選択時に他のKWも5人以上満たす編成を優先</div>
+          </div>
+          <label class="sw"><input type="checkbox" id="multiKwToggle" checked><span class="sw-track"></span></label>
+        </div>
+        <div class="setting-row">
+          <div class="setting-label">
+            3属性以上の編成を強調
+            <div class="setting-desc">ボーナス含め3KW以上を満たす場合に金枠・バッジを表示</div>
+          </div>
+          <label class="sw"><input type="checkbox" id="jackpotHighlightToggle" checked><span
+              class="sw-track"></span></label>
+        </div>
+        <div class="setting-row">
+          <div class="setting-label">
+            メインキーワード
+            <div class="setting-desc">このKWの人数が多い（6人・7人）編成を優先表示。KW選択後に設定可</div>
+          </div>
+          <select id="mainKwSelect" class="setting-select">
+            <option value="">なし</option>
+          </select>
+        </div>
+        <div class="setting-row">
+          <div class="setting-label">表示件数</div>
+          <select id="maxResultsSelect" class="setting-select">
+            <option value="5">5件</option>
+            <option value="10">10件</option>
+            <option value="15">15件</option>
+            <option value="20">20件</option>
+            <option value="30">30件</option>
+            <option value="50">50件</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <button class="run-btn" id="runBtn" onclick="search()">編成を探す</button>
+    <div class="status-line" id="status"></div>
+    <div id="results"></div>
+  </div>
+
+  <!-- ========== 追加ページ ========== -->
+  <div class="page" id="page-add">
+    <div class="sec">
+      <div class="sec-head"><span class="sec-label">新しい人格を追加</span></div>
+      <div class="sec-body">
+        <div class="form-grid">
+          <div class="f-group">
+            <span class="f-label">囚人名 *</span>
+            <select id="f-prisoner" class="f-input">
+              <option value="">-- 選択 --</option>
+              <option>イサン</option>
+              <option>ファウスト</option>
+              <option>ドンキホーテ</option>
+              <option>良秀</option>
+              <option>ムルソー</option>
+              <option>ホンル</option>
+              <option>ヒースクリフ</option>
+              <option>イシュメール</option>
+              <option>ロージャ</option>
+              <option>シンクレア</option>
+              <option>ウーティス</option>
+              <option>グレゴール</option>
+            </select>
+          </div>
+          <div class="f-group">
+            <span class="f-label">人格名 *</span>
+            <input id="f-name" type="text" class="f-input" placeholder="例: ヴァルプルギス○○">
+          </div>
+          <div class="f-group">
+            <span class="f-label">レアリティ</span>
+            <select id="f-stars" class="f-input">
+              <option value="3">★★★</option>
+              <option value="2">★★</option>
+              <option value="1">★</option>
+            </select>
+          </div>
+          <div class="f-group">
+            <span class="f-label">シーズン（Wはヴァルプルギス）</span>
+            <input id="f-season" type="text" class="f-input" placeholder="例: 8 または W">
+          </div>
+          <div class="f-group" style="grid-column:1/-1">
+            <span class="f-label">キーワード（複数可）</span>
+            <div class="kw-checks" id="kwChecksAdd"></div>
+          </div>
+          <div class="f-group" style="grid-column:1/-1">
+            <span class="f-label">所属（任意）</span>
+            <input id="f-affiliation" type="text" class="f-input" placeholder="例: 蜘蛛の巣,薬指">
+          </div>
+        </div>
+        <div class="form-footer">
+          <button class="btn-primary" onclick="addPersona()">追加する</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="sec">
+      <div class="sec-head"><span class="sec-label">エクスポート / インポート</span></div>
+      <div class="sec-body">
+        <div class="io-row">
+          <button class="btn-ghost" onclick="exportData()">↑ エクスポート</button>
+          <button class="btn-ghost" onclick="document.getElementById('importFile').click()">↓ インポート</button>
+          <input type="file" id="importFile" accept=".json" style="display:none" onchange="importData(this)">
+        </div>
+        <div class="info-note">JSONファイルに保存しておくと別PCでも使えます。インポートは既存データと統合されます（重複IDは上書き）。ベースデータの編集はデータベースタブから。</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== 完全網羅ページ ========== -->
+  <div class="page" id="page-complete">
+    <div class="sec">
+      <div class="sec-head" style="padding:16px 20px 8px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+        <span class="sec-label" style="margin:0">組める編成を完全網羅</span>
+        <span id="complete-status" style="font-size:12px;color:var(--c-sub);flex:1"></span>
+        <span style="font-size:11px;color:var(--c-sub)">KW数</span>
+        <select id="completeKwCount" class="f-select" style="width:80px" onchange="runComplete()">
+          <option value="1">1</option>
+          <option value="2" selected>2</option>
+          <option value="3">3</option>
+        </select>
+      </div>
+      <p style="font-size:11px;color:var(--c-sub);padding:0 20px 14px;line-height:1.7">全KW組み合わせを完全網羅探索（人格の全通りを試す）。クリックで詳細を表示。</p>
+    </div>
+    <div id="complete-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;margin-bottom:32px"></div>
+    <div id="complete-detail" style="display:none">
+      <div class="sec">
+        <div class="sec-head" style="padding:16px 20px 8px;display:flex;align-items:center;gap:12px">
+          <span class="sec-label" id="detail-title" style="margin:0"></span>
+          <button class="btn-ghost" onclick="closeDetail()" style="margin-left:auto;height:30px;padding:0 12px;font-size:12px">✕ 閉じる</button>
+        </div>
+        <div style="padding:0 20px 8px;font-size:11px;color:var(--c-sub)">必須人格（この人格なしでは編成不可）/ 高採用（多くの有効編成に登場）</div>
+        <div id="detail-body" style="padding:0 0 12px"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== DBページ ========== -->
+  <div class="page" id="page-db">
+    <div class="sec">
+      <div class="sec-head">
+        <span class="sec-label">全人格データベース</span>
+        <span class="db-stats" id="dbStats"></span>
+      </div>
+      <div class="sec-body">
+        <div class="db-toolbar">
+          <input class="db-search" id="dbSearch" placeholder="名前・囚人名で検索..." oninput="renderDB()">
+          <select class="db-filter" id="dbFilterPrisoner" onchange="renderDB()">
+            <option value="">全囚人</option>
+            <option>イサン</option>
+            <option>ファウスト</option>
+            <option>ドンキホーテ</option>
+            <option>良秀</option>
+            <option>ムルソー</option>
+            <option>ホンル</option>
+            <option>ヒースクリフ</option>
+            <option>イシュメール</option>
+            <option>ロージャ</option>
+            <option>シンクレア</option>
+            <option>ウーティス</option>
+            <option>グレゴール</option>
+          </select>
+          <select class="db-filter" id="dbFilterKw" onchange="renderDB()">
+            <option value="">全KW</option>
+            <option>火傷</option>
+            <option>出血</option>
+            <option>振動</option>
+            <option>破裂</option>
+            <option>沈潜</option>
+            <option>呼吸</option>
+            <option>充電</option>
+          </select>
+        </div>
+        <div class="db-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>囚人</th>
+                <th>人格名</th>
+                <th>★</th>
+                <th>S</th>
+                <th>キーワード</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody id="dbBody"></tbody>
+          </table>
+        </div>
+        <div class="db-footer">
+          <button class="btn-danger" onclick="resetBaseData()">ベースデータをリセット</button>
+          <span class="info-note" style="padding:0;margin-left:8px">追加した人格は残ります</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL -->
+  <div class="modal-overlay" id="editModal">
+    <div class="modal">
+      <div class="modal-title">人格を編集</div>
+      <input type="hidden" id="edit-id">
+      <div class="form-grid">
+        <div class="f-group">
+          <span class="f-label">囚人名</span>
+          <select id="edit-prisoner" class="f-input">
+            <option>イサン</option>
+            <option>ファウスト</option>
+            <option>ドンキホーテ<    const BUILTIN_PERSONAS = [{"id": "101", "name": "LCB囚人", "prisoner": "イサン", "season": 0, "stars": 1, "keywords": ["沈潜"], "affiliation": "LimbusCompany", "ver": 8}, {"id": "102", "name": "南部セブン協会6課", "prisoner": "イサン", "season": 0, "stars": 2, "keywords": ["破裂"], "affiliation": "セブン協会", "ver": 8}, {"id": "103", "name": "剣契殺手", "prisoner": "イサン", "season": 0, "stars": 3, "keywords": ["呼吸"], "affiliation": "剣契", "ver": 8}, {"id": "104", "name": "開花E.G.O::壇香梅", "prisoner": "イサン", "season": 2, "stars": 3, "keywords": ["沈潜"], "affiliation": "技術開放連合", "ver": 8}, {"id": "105", "name": "奥歯事務所フィクサー", "prisoner": "イサン", "season": 2, "stars": 2, "keywords": ["振動"], "affiliation": "奥歯事務所", "ver": 8}, {"id": "106", "name": "W社3級整理要員", "prisoner": "イサン", "season": 0, "stars": 3, "keywords": ["充電", "破裂"], "affiliation": "W社", "ver": 8}, {"id": "107", "name": "ピークォド号1等航海士", "prisoner": "イサン", "season": 3, "stars": 2, "keywords": ["呼吸", "出血"], "affiliation": "ピークォド号", "ver": 8}, {"id": "108", "name": "南部ディエーチ協会4課", "prisoner": "イサン", "season": 0, "stars": 2, "keywords": ["沈潜"], "affiliation": "ディエーチ協会", "ver": 8}, {"id": "109", "name": "薬指点描派スチューデント", "prisoner": "イサン", "season": 0, "stars": 3, "keywords": ["出血"], "affiliation": "薬指", "ver": 8}, {"id": "110", "name": "ロボトミーE.G.O::厳粛な哀悼", "prisoner": "イサン", "season": "W", "stars": 3, "keywords": ["沈潜"], "affiliation": "旧L社", "ver": 8}, {"id": "111", "name": "LCE E.G.O:: 提灯", "prisoner": "イサン", "season": 5, "stars": 2, "keywords": ["破裂"], "affiliation": "LimbusCompany", "ver": 8}, {"id": "112", "name": "南部リウ協会3課", "prisoner": "イサン", "season": 0, "stars": 3, "keywords": ["火傷"], "affiliation": "リウ協会", "ver": 8}, {"id": "113", "name": "N社E.G.O::凶弾", "prisoner": "イサン", "season": 6, "stars": 3, "keywords": ["呼吸", "出血"], "affiliation": "N社", "ver": 8}, {"id": "114", "name": "黒獣-午 筆頭", "prisoner": "イサン", "season": 6, "stars": 3, "keywords": ["振動", "破裂"], "affiliation": "H社,黒獣", "ver": 8}, {"id": "115", "name": "蜘蛛の巣人差し指の親方", "prisoner": "イサン", "season": 7, "stars": 3, "keywords": ["呼吸", "沈潜"], "affiliation": "蜘蛛の巣,人差し指", "ver": 8}, {"id": "201", "name": "LCB囚人", "prisoner": "ファウスト", "season": 0, "stars": 1, "keywords": [], "affiliation": "LimbusCompany", "ver": 8}, {"id": "202", "name": "W社2級整理要員", "prisoner": "ファウスト", "season": 0, "stars": 2, "keywords": ["充電"], "affiliation": "W社", "ver": 8}, {"id": "203", "name": "生き残ったロボトミー職員", "prisoner": "ファウスト", "season": 1, "stars": 2, "keywords": ["呼吸", "破裂"], "affiliation": "旧L社", "ver": 8}, {"id": "204", "name": "握る者", "prisoner": "ファウスト", "season": 1, "stars": 3, "keywords": ["出血"], "affiliation": "N社", "ver": 8}, {"id": "205", "name": "南部ツヴァイ協会4課", "prisoner": "ファウスト", "season": 0, "stars": 2, "keywords": [], "affiliation": "ツヴァイ教会", "ver": 8}, {"id": "206", "name": "南部セブン協会4課", "prisoner": "ファウスト", "season": 0, "stars": 3, "keywords": ["破裂"], "affiliation": "セブン協会", "ver": 8}, {"id": "207", "name": "ロボトミーE.G.O::後悔", "prisoner": "ファウスト", "season": "W", "stars": 3, "keywords": ["振動"], "affiliation": "旧L社", "ver": 8}, {"id": "208", "name": "剣契殺手", "prisoner": "ファウスト", "season": 3, "stars": 3, "keywords": ["呼吸"], "affiliation": "剣契", "ver": 8}, {"id": "209", "name": "ワザリング・ハイツ バトラー", "prisoner": "ファウスト", "season": 4, "stars": 2, "keywords": ["沈潜"], "affiliation": "ワザリング・ハイツ", "ver": 8}, {"id": "210", "name": "マルチクラック事務所 代表", "prisoner": "ファウスト", "season": 4, "stars": 3, "keywords": ["充電"], "affiliation": "マルチクラック事務所", "ver": 8}, {"id": "211", "name": "LCE E.G.O:: 紅炎殺", "prisoner": "ファウスト", "season": 5, "stars": 3, "keywords": ["火傷"], "affiliation": "LimbusCompany", "ver": 8}, {"id": "212", "name": "黒獣-卯 筆頭", "prisoner": "ファウスト", "season": 6, "stars": 3, "keywords": ["破裂"], "affiliation": "H社,黒獣", "ver": 10}, {"id": "213", "name": "東部シ協会3課", "prisoner": "ファウスト", "season": 0, "stars": 3, "keywords": ["出血", "呼吸"], "affiliation": "シ協会", "ver": 8}, {"id": "214", "name": "人差し指遂行者：【紙片】", "prisoner": "ファウスト", "season": 7, "stars": 3, "keywords": ["呼吸", "沈潜"], "affiliation": "人差し指", "ver": 8}, {"id": "215", "name": "蜘蛛の巣薬指の子方", "prisoner": "ファウスト", "season": 7, "stars": 3, "keywords": ["充電", "出血"], "affiliation": "蜘蛛の巣,薬指", "ver": 8}, {"id": "301", "name": "LCB囚人", "prisoner": "ドンキホーテ", "season": 0, "stars": 1, "keywords": ["出血"], "affiliation": "LimbusCompany", "ver": 8}, {"id": "302", "name": "W社3級整理要員", "prisoner": "ドンキホーテ", "season": 0, "stars": 3, "keywords": ["充電"], "affiliation": "W社", "ver": 8}, {"id": "303", "name": "南部シ協会5課", "prisoner": "ドンキホーテ", "season": 0, "stars": 2, "keywords": ["呼吸"], "affiliation": "シ協会", "ver": 8}, {"id": "304", "name": "N社中鎚", "prisoner": "ドンキホーテ", "season": 1, "stars": 2, "keywords": ["出血"], "affiliation": "N社", "ver": 8}, {"id": "305", "name": "南部センク協会5課部長", "prisoner": "ドンキホーテ", "season": 0, "stars": 3, "keywords": ["呼吸"], "affiliation": "センク協会", "ver": 8}, {"id": "306", "name": "中指末妹", "prisoner": "ドンキホーテ", "season": 3, "stars": 3, "keywords": ["出血"], "affiliation": "中指", "ver": 8}, {"id": "307", "name": "ロボトミーE.G.O::提灯", "prisoner": "ドンキホーテ", "season": "W", "stars": 2, "keywords": ["破裂"], "affiliation": "旧L社", "ver": 8}, {"id": "308", "name": "剣契殺手", "prisoner": "ドンキホーテ", "season": 3, "stars": 2, "keywords": ["呼吸"], "affiliation": "剣契", "ver": 8}, {"id": "309", "name": "T社3級徴収職職員", "prisoner": "ドンキホーテ", "season": 0, "stars": 3, "keywords": ["振動"], "affiliation": "T社", "ver": 8}, {"id": "310", "name": "ラ・マンチャランド室長", "prisoner": "ドンキホーテ", "season": 5, "stars": 3, "keywords": ["出血"], "affiliation": "ラ・マンチャランド", "ver": 8}, {"id": "311", "name": "東部センク協会3課", "prisoner": "ドンキホーテ", "season": 0, "stars": 3, "keywords": ["呼吸", "火傷"], "affiliation": "センク協会", "ver": 8}, {"id": "312", "name": "ロボトミーE.G.O::愛と憎悪の名の下に", "prisoner": "ドンキホーテ", "season": "W", "stars": 3, "keywords": ["充電", "沈潜", "破裂"], "affiliation": "旧L社", "ver": 8}, {"id": "313", "name": "黒獣-未", "prisoner": "ドンキホーテ", "season": 6, "stars": 3, "keywords": ["沈潜", "破裂"], "affiliation": "H社,黒獣", "ver": 8}, {"id": "314", "name": "人差し指代行者-開花E.G.O::代行", "prisoner": "ドンキホーテ", "season": 7, "stars": 3, "keywords": ["呼吸", "沈潜"], "affiliation": "人差し指", "ver": 8}, {"id": "401", "name": "LCB囚人", "prisoner": "良秀", "season": 0, "stars": 1, "keywords": ["呼吸"], "affiliation": "LimbusCompany", "ver": 8}, {"id": "402", "name": "南部セブン協会6課", "prisoner": "良秀", "season": 0, "stars": 2, "keywords": ["破裂"], "affiliation": "セブン協会", "ver": 8}, {"id": "403", "name": "黒雲会若衆", "prisoner": "良秀", "season": 0, "stars": 3, "keywords": ["出血"], "affiliation": "黒雲会", "ver": 8}, {"id": "404", "name": "りょ・ミ・パ厨房長", "prisoner": "良秀", "season": 1, "stars": 3, "keywords": ["出血"], "affiliation": "りょ・ミ・パ", "ver": 8}, {"id": "405", "name": "W社3級整理要員", "prisoner": "良秀", "season": 0, "stars": 3, "keywords": ["充電"], "affiliation": "W社", "ver": 8}, {"id": "406", "name": "LCCB係長", "prisoner": "良秀", "season": 3, "stars": 2, "keywords": ["呼吸", "振動", "破裂"], "affiliation": "LimbusCompany", "ver": 8}, {"id": "407", "name": "南部リウ協会4課", "prisoner": "良秀", "season": 0, "stars": 2, "keywords": ["火傷"], "affiliation": "リウ協会", "ver": 8}, {"id": "408", "name": "エドガー家 チーフバトラー", "prisoner": "良秀", "season": 4, "stars": 3, "keywords": ["呼吸"], "affiliation": "エドガー家", "ver": 8}, {"id": "409", "name": "20区ユロージヴィ", "prisoner": "良秀", "season": 4, "stars": 2, "keywords": ["振動"], "affiliation": "ユロージビィ", "ver": 8}, {"id": "410", "name": "ロボトミーE.G.O::赤眼･懺悔", "prisoner": "良秀", "season": "W", "stars": 3, "keywords": ["充電", "出血"], "affiliation": "旧L社", "ver": 8}, {"id": "411", "name": "黒獣-卯", "prisoner": "良秀", "season": 5, "stars": 3, "keywords": ["破裂"], "affiliation": "H社,黒獣", "ver": 8}, {"id": "412", "name": "N社E.G.O::軽蔑、畏敬", "prisoner": "良秀", "season": 6, "stars": 3, "keywords": ["出血", "振動"], "affiliation": "N社", "ver": 8}, {"id": "413", "name": "鴻園の放浪武者", "prisoner": "良秀", "season": 6, "stars": 3, "keywords": ["呼吸", "破裂"], "affiliation": "H社", "ver": 8}, {"id": "414", "name": "ロボトミーE.G.O::残香・寂しさ", "prisoner": "良秀", "season": "W", "stars": 3, "keywords": ["沈潜", "振動"], "affiliation": "旧L社", "ver": 8}, {"id": "501", "name": "LCB囚人", "prisoner": "ムルソー", "season": 0, "stars": 1, "keywords": ["振動"], "affiliation": "LimbusCompany", "ver": 8}, {"id": "502", "name": "南部リウ協会6課", "prisoner": "ムルソー", "season": 0, "stars": 2, "keywords": ["火傷"], "affiliation": "リウ協会", "ver": 8}, {"id": "503", "name": "W社2級整理要員", "prisoner": "ムルソー", "season": 0, "stars": 3, "keywords": ["充電"], "affiliation": "W社", "ver": 8}, {"id": "504", "name": "N社大鎚", "prisoner": "ムルソー", "season": 1, "stars": 3, "keywords": ["出血"], "affiliation": "N社", "ver": 8}, {"id": "505", "name": "バラのスパナ工房フィクサー", "prisoner": "ムルソー", "season": 2, "stars": 2, "keywords": ["充電", "振動"], "affiliation": "バラのスパナ工房", "ver": 8}, {"id": "506", "name": "R社第4群サイチーム", "prisoner": "ムルソー", "season": 0, "stars": 3, "keywords": ["充電", "出血"], "affiliation": "R社", "ver": 8}, {"id": "507", "name": "中指末弟", "prisoner": "ムルソー", "season": 3, "stars": 2, "keywords": ["出血"], "affiliation": "中指", "ver": 8}, {"id": "508", "name": "剣契頭目", "prisoner": "ムルソー", "season": 3, "stars": 3, "keywords": ["呼吸"], "affiliation": "剣契", "ver": 8}, {"id": "509", "name": "デッドラビッツ ボス", "prisoner": "ムルソー", "season": 4, "stars": 2, "keywords": ["破裂"], "affiliation": "デッドラビッツ", "ver": 8}, {"id": "510", "name": "南部ディエーチ協会4課部長", "prisoner": "ムルソー", "season": 0, "stars": 3, "keywords": ["沈潜"], "affiliation": "ディエーチ協会", "ver": 8}, {"id": "511", "name": "西部センク協会3課", "prisoner": "ムルソー", "season": 5, "stars": 3, "keywords": ["呼吸", "破裂"], "affiliation": "センク協会", "ver": 8}, {"id": "512", "name": "東部親指カポIIII", "prisoner": "ムルソー", "season": 6, "stars": 3, "keywords": ["振動", "火傷"], "affiliation": "親指,小指", "ver": 8}, {"id": "513", "name": "ラ・マンチャランドの王子", "prisoner": "ムルソー", "season": 6, "stars": 3, "keywords": ["出血", "破裂"], "affiliation": "ラ・マンチャランド", "ver": 8}, {"id": "514", "name": "ロボトミーE.G.O::ホーネット【変調】", "prisoner": "ムルソー", "season": "W", "stars": 3, "keywords": ["出血", "火傷"], "affiliation": "旧L社", "ver": 8}, {"id": "515", "ver": 10, "name": "薬指野獣派スチューデント", "prisoner": "ムルソー", "season": 7, "stars": 3, "keywords": ["出血", "沈潜"], "affiliation": "薬指"}, {"id": "601", "name": "LCB囚人", "prisoner": "ホンル", "season": 0, "stars": 1, "keywords": ["沈潜"], "affiliation": "LimbusCompany", "ver": 8}, {"id": "602", "name": "黒雲会若衆", "prisoner": "ホンル", "season": 0, "stars": 2, "keywords": ["出血"], "affiliation": "黒雲会", "ver": 8}, {"id": "603", "name": "ぽんぽん派ボス", "prisoner": "ホンル", "season": 1, "stars": 3, "keywords": ["出血"], "affiliation": "ぽんぽん派", "ver": 8}, {"id": "604", "name": "南部リウ協会5課", "prisoner": "ホンル", "season": 0, "stars": 2, "keywords": ["火傷"], "affiliation": "リウ協会", "ver": 8}, {"id": "605", "name": "K社3級摘出職職員", "prisoner": "ホンル", "season": 2, "stars": 3, "keywords": ["破裂"], "affiliation": "K社", "ver": 8}, {"id": "606", "name": "W社2級整理要員", "prisoner": "ホンル", "season": 0, "stars": 2, "keywords": ["充電", "破裂"], "affiliation": "W社", "ver": 8}, {"id": "607", "name": "鈎事務所フィクサー", "prisoner": "ホンル", "season": "W", "stars": 2, "keywords": ["出血"], "affiliation": "鈎事務所", "ver": 8}, {"id": "608", "name": "南部ディエーチ協会4課", "prisoner": "ホンル", "season": 0, "stars": 3, "keywords": ["沈潜"], "affiliation": "ディエーチ協会", "ver": 8}, {"id": "609", "name": "20区ユロージヴィ", "prisoner": "ホンル", "season": 4, "stars": 3, "keywords": ["振動"], "affiliation": "ユロージビィ", "ver": 8}, {"id": "610", "name": "牙狩事務所フィクサー", "prisoner": "ホンル", "season": 5, "stars": 2, "keywords": ["破裂"], "affiliation": "牙狩事務所", "ver": 8}, {"id": "611", "name": "終止符事務所代表", "prisoner": "ホンル", "season": "W", "stars": 3, "keywords": ["呼吸"], "affiliation": "終止符事務所", "ver": 8}, {"id": "612", "name": "R社第4群トナカイチーム", "prisoner": "ホンル", "season": 0, "stars": 3, "keywords": ["充電", "沈潜"], "affiliation": "R社", "ver": 8}, {"id": "613", "name": "鴻園の君主", "prisoner": "ホンル", "season": 6, "stars": 3, "keywords": ["呼吸", "破裂"], "affiliation": "H社", "ver": 8}, {"id": "614", "name": "蜘蛛の巣薬指の親方", "prisoner": "ホンル", "season": 7, "stars": 3, "keywords": ["充電", "出血"], "affiliation": "蜘蛛の巣,薬指", "ver": 8}, {"id": "701", "name": "LCB囚人", "prisoner": "ヒースクリフ", "season": 0, "stars": 1, "keywords": ["振動"], "affiliation": "LimbusCompany", "ver": 8}, {"id": "702", "name": "南部シ協会5課", "prisoner": "ヒースクリフ", "season": 0, "stars": 2, "keywords": ["呼吸"], "affiliation": "シ協会", "ver": 8}, {"id": "703", "name": "R社第4群ウサギチーム", "prisoner": "ヒースクリフ", "season": 0, "stars": 3, "keywords": ["充電", "破裂", "出血"], "affiliation": "R社", "ver": 8}, {"id": "704", "name": "N社小鎚", "prisoner": "ヒースクリフ", "season": 1, "stars": 2, "keywords": ["出血"], "affiliation": "N社", "ver": 8}, {"id": "705", "name": "ロボトミーE.G.O::狐雨", "prisoner": "ヒースクリフ", "season": 2, "stars": 3, "keywords": ["沈潜", "破裂"], "affiliation": "技術開放連合", "ver": 8}, {"id": "706", "name": "南部セブン協会4課", "prisoner": "ヒースクリフ", "season": 0, "stars": 2, "keywords": ["破裂"], "affiliation": "セブン協会", "ver": 8}, {"id": "707", "name": "ピークォド号銛使い", "prisoner": "ヒースクリフ", "season": 3, "stars": 3, "keywords": ["呼吸", "出血"], "affiliation": "ピークォド号", "ver": 8}, {"id": "708", "name": "南部ウーフィ協会3課", "prisoner": "ヒースクリフ", "season": 0, "stars": 3, "keywords": ["振動"], "affiliation": "ウーフィ協会", "ver": 8}, {"id": "709", "name": "マルチクラック事務所フィクサー", "prisoner": "ヒースクリフ", "season": 4, "stars": 2, "keywords": ["充電"], "affiliation": "マルチクラック事務所", "ver": 8}, {"id": "710", "name": "ワイルドハント", "prisoner": "ヒースクリフ", "season": 4, "stars": 3, "keywords": ["沈潜"], "affiliation": "ワザリング・ハイツ", "ver": 8}, {"id": "711", "name": "終止符事務所フィクサー", "prisoner": "ヒースクリフ", "season": "W", "stars": 3, "keywords": ["呼吸"], "affiliation": "終止符事務所", "ver": 8}, {"id": "712", "name": "黒雲会若衆", "prisoner": "ヒースクリフ", "season": 5, "stars": 3, "keywords": ["出血"], "affiliation": "黒雲会", "ver": 8}, {"id": "713", "name": "W社4級整理要員-CCA", "prisoner": "ヒースクリフ", "season": 6, "stars": 3, "keywords": ["充電", "破裂"], "affiliation": "W社", "ver": 8}, {"id": "714", "name": "黒獣-酉 筆頭", "prisoner": "ヒースクリフ", "season": 6, "stars": 3, "keywords": ["火傷", "破裂"], "affiliation": "H社,黒獣", "ver": 8}, {"id": "801", "name": "LCB囚人", "prisoner": "イシュメール", "season": 0, "stars": 1, "keywords": ["振動"], "affiliation": "LimbusCompany", "ver": 8}, {"id": "802", "name": "R社第4群トナカイチーム", "prisoner": "イシュメール", "season": 0, "stars": 3, "keywords": ["充電", "沈潜"], "affiliation": "R社", "ver": 8}, {"id": "803", "name": "南部シ協会5課", "prisoner": "イシュメール", "season": 0, "stars": 2, "keywords": ["呼吸"], "affiliation": "シ協会", "ver": 8}, {"id": "804", "name": "LCCB係長", "prisoner": "イシュメール", "season": 1, "stars": 2, "keywords": ["振動", "破裂"], "affiliation": "LimbusCompany", "ver": 8}, {"id": "805", "name": "ロボトミーE.G.O::たぷつき", "prisoner": "イシュメール", "season": 2, "stars": 2, "keywords": ["振動", "破裂"], "affiliation": "技術開放連合", "ver": 8}, {"id": "806", "name": "南部リウ協会4課", "prisoner": "イシュメール", "season": 0, "stars": 3, "keywords": ["火傷"], "affiliation": "リウ協会", "ver": 8}, {"id": "807", "name": "奥歯ボートセンターフィクサー", "prisoner": "イシュメール", "season": 2, "stars": 3, "keywords": ["沈潜"], "affiliation": "奥歯ボートセンター", "ver": 8}, {"id": "808", "name": "ピークォド号船長", "prisoner": "イシュメール", "season": 3, "stars": 3, "keywords": ["火傷", "出血", "呼吸"], "affiliation": "ピークォド号", "ver": 10}, {"id": "809", "name": "エドガー家 バトラー", "prisoner": "イシュメール", "season": 4, "stars": 2, "keywords": ["呼吸", "沈潜"], "affiliation": "エドガー家", "ver": 8}, {"id": "810", "name": "西部ツヴァイ協会3課", "prisoner": "イシュメール", "season": 0, "stars": 3, "keywords": ["振動"], "affiliation": "ツヴァイ協会", "ver": 8}, {"id": "811", "name": "黒雲会副組長", "prisoner": "イシュメール", "season": 5, "stars": 3, "keywords": ["出血"], "affiliation": "黒雲会", "ver": 8}, {"id": "812", "name": "家主候補", "prisoner": "イシュメール", "season": 6, "stars": 3, "keywords": ["呼吸", "破裂"], "affiliation": "H社", "ver": 8}, {"id": "813", "name": "定事務所代表", "prisoner": "イシュメール", "season": "W", "stars": 3, "keywords": ["沈潜", "振動"], "affiliation": "定事務所", "ver": 8}, {"id": "814", "name": "蜘蛛の巣中指の子方", "prisoner": "イシュメール", "season": 7, "stars": 3, "keywords": ["出血", "火傷"], "affiliation": "中指", "ver": 8}, {"id": "901", "name": "LCB囚人", "prisoner": "ロージャ", "season": 0, "stars": 1, "keywords": ["出血"], "affiliation": "LimbusCompany", "ver": 8}, {"id": "902", "name": "黒雲会若衆", "prisoner": "ロージャ", "season": 0, "stars": 3, "keywords": ["出血", "呼吸"], "affiliation": "黒雲会", "ver": 8}, {"id": "903", "name": "LCCB係長", "prisoner": "ロージャ", "season": 1, "stars": 2, "keywords": [], "affiliation": "LimbusCompany", "ver": 10}, {"id": "904", "name": "N社中鎚", "prisoner": "ロージャ", "season": 1, "stars": 2, "keywords": ["出血"], "affiliation": "N社", "ver": 8}, {"id": "905", "name": "バラのスパナ工房代表", "prisoner": "ロージャ", "season": 2, "stars": 3, "keywords": ["振動"], "affiliation": "バラのスパナ工房", "ver": 8}, {"id": "906", "name": "南部ツヴァイ協会5課", "prisoner": "ロージャ", "season": 0, "stars": 2, "keywords": ["振動"], "affiliation": "ツヴァイ協会", "ver": 8}, {"id": "907", "name": "南部ディエーチ協会4課", "prisoner": "ロージャ", "season": 0, "stars": 3, "keywords": ["沈潜"], "affiliation": "ディエーチ協会", "ver": 8}, {"id": "908", "name": "南部リウ協会4課部長", "prisoner": "ロージャ", "season": 0, "stars": 3, "keywords": ["火傷"], "affiliation": "リウ協会", "ver": 8}, {"id": "909", "name": "T社2級徴収職職員", "prisoner": "ロージャ", "season": 0, "stars": 2, "keywords": ["振動"], "affiliation": "T社", "ver": 8}, {"id": "910", "name": "北部ヂェーヴィチ協会3課", "prisoner": "ロージャ", "season": 0, "stars": 3, "keywords": ["破裂"], "affiliation": "ヂェーヴィチ協会", "ver": 8}, {"id": "911", "name": "ラ・マンチャランドの姫", "prisoner": "ロージャ", "season": 5, "stars": 3, "keywords": ["出血", "破裂"], "affiliation": "ラ・マンチャランド", "ver": 8}, {"id": "912", "name": "黒獣-巳", "prisoner": "ロージャ", "season": 6, "stars": 3, "keywords": ["呼吸", "破裂"], "affiliation": "H社,黒獣", "ver": 8}, {"id": "913", "name": "ロボトミーE.G.O::涙で研ぎ澄まされた剣", "prisoner": "ロージャ", "season": "W", "stars": 3, "keywords": ["充電", "沈潜"], "affiliation": "旧L社", "ver": 8}, {"id": "914", "name": "R社第4群トナカイチーム", "prisoner": "ロージャ", "season": 0, "stars": 3, "keywords": ["充電", "沈潜"], "affiliation": "R社", "ver": 8}, {"id": "915", "ver": 10, "name": "薬指野獣派ドーセント", "prisoner": "ロージャ", "season": 7, "stars": 3, "keywords": ["出血", "沈潜"], "affiliation": "薬指"}, {"id": "1001", "name": "LCB囚人", "prisoner": "シンクレア", "season": 0, "stars": 1, "keywords": ["破裂"], "affiliation": "LimbusCompany", "ver": 8}, {"id": "1002", "name": "剣契殺手", "prisoner": "シンクレア", "season": 0, "stars": 3, "keywords": ["呼吸", "出血"], "affiliation": "剣契", "ver": 8}, {"id": "1003", "name": "南部ツヴァイ協会6課", "prisoner": "シンクレア", "season": 0, "stars": 2, "keywords": ["振動"], "affiliation": "ツヴァイ", "ver": 8}, {"id": "1004", "name": "マリアッチボス", "prisoner": "シンクレア", "season": 1, "stars": 2, "keywords": ["呼吸", "沈潜"], "affiliation": "マリアッチ", "ver": 8}, {"id": "1005", "name": "握らんとする者", "prisoner": "シンクレア", "season": 1, "stars": 3, "keywords": ["出血", "火傷"], "affiliation": "N社", "ver": 8}, {"id": "1006", "name": "ロボトミーE.G.O::紅籍", "prisoner": "シンクレア", "season": 2, "stars": 2, "keywords": ["破裂"], "affiliation": "技術開放連合", "ver": 8}, {"id": "1007", "name": "奥歯ボセンターフィクサー", "prisoner": "シンクレア", "season": 2, "stars": 2, "keywords": ["振動"], "affiliation": "奥歯ボートセンター", "ver": 8}, {"id": "1008", "name": "南部センク協会4課部長", "prisoner": "シンクレア", "season": 0, "stars": 3, "keywords": ["呼吸"], "affiliation": "センク協会", "ver": 8}, {"id": "1009", "name": "夜明事務所フィクサー", "prisoner": "シンクレア", "season": "W", "stars": 3, "keywords": ["火傷"], "affiliation": "夜明事務所", "ver": 8}, {"id": "1010", "name": "西部ツヴァイ協会3課", "prisoner": "シンクレア", "season": 5, "stars": 2, "keywords": ["振動"], "affiliation": "ツヴァイ協会", "ver": 8}, {"id": "1011", "name": "北部ヂェーヴィチ協会3課", "prisoner": "シンクレア", "season": 0, "stars": 3, "keywords": ["破裂"], "affiliation": "ヂェーヴィチ協会", "ver": 8}, {"id": "1012", "name": "中指末弟", "prisoner": "シンクレア", "season": 0, "stars": 3, "keywords": ["出血"], "affiliation": "中指", "ver": 8}, {"id": "1013", "name": "東部親指ソルダートII", "prisoner": "シンクレア", "season": 6, "stars": 3, "keywords": ["振動", "火傷"], "affiliation": "親指", "ver": 8}, {"id": "1014", "name": "黒獣-酉", "prisoner": "シンクレア", "season": 6, "stars": 3, "keywords": ["火傷", "破裂"], "affiliation": "H社,黒獣", "ver": 8}, {"id": "1015", "name": "蜘蛛の巣小指の子方", "prisoner": "シンクレア", "season": 7, "stars": 3, "keywords": ["出血", "呼吸"], "affiliation": "蜘蛛の巣", "ver": 8}, {"id": "1101", "name": "LCB囚人", "prisoner": "ウーティス", "season": 0, "stars": 1, "keywords": ["破裂"], "affiliation": "LimbusCompany", "ver": 8}, {"id": "1102", "name": "剣契殺手", "prisoner": "ウーティス", "season": 0, "stars": 2, "keywords": ["呼吸"], "affiliation": "剣契", "ver": 8}, {"id": "1103", "name": "G社部長", "prisoner": "ウーティス", "season": 1, "stars": 2, "keywords": ["沈潜"], "affiliation": "G社", "ver": 8}, {"id": "1104", "name": "南部セブン協会6課部長", "prisoner": "ウーティス", "season": 0, "stars": 3, "keywords": ["破裂"], "affiliation": "セブン協会", "ver": 8}, {"id": "1105", "name": "奥歯事務所フィクサー", "prisoner": "ウーティス", "season": 2, "stars": 3, "keywords": ["振動"], "affiliation": "奥歯事務所", "ver": 8}, {"id": "1106", "name": "南部センク協会4課", "prisoner": "ウーティス", "season": 0, "stars": 2, "keywords": ["呼吸"], "affiliation": "センク協会", "ver": 8}, {"id": "1107", "name": "ロボトミーE.G.O::魔弾", "prisoner": "ウーティス", "season": "W", "stars": 3, "keywords": ["火傷"], "affiliation": "旧L社", "ver": 8}, {"id": "1108", "name": "ワザリング・ハイツチーフバトラー", "prisoner": "ウーティス", "season": 4, "stars": 3, "keywords": ["沈潜"], "affiliation": "ワザリング・ハイツ", "ver": 8}, {"id": "1109", "name": "薬指点描派スチューデント", "prisoner": "ウーティス", "season": 0, "stars": 2, "keywords": ["出血"], "affiliation": "薬指", "ver": 8}, {"id": "1110", "name": "W社3級整理要員チーフ", "prisoner": "ウーティス", "season": 0, "stars": 3, "keywords": ["充電", "破裂"], "affiliation": "W社", "ver": 8}, {"id": "1111", "name": "ラ・マンチャランド 理髪師", "prisoner": "ウーティス", "season": 5, "stars": 3, "keywords": ["出血"], "affiliation": "ラ・マンチャランド", "ver": 8}, {"id": "1112", "name": "黒獣-卯", "prisoner": "ウーティス", "season": 5, "stars": 3, "keywords": ["破裂"], "affiliation": "H社,黒獣", "ver": 8}, {"id": "1113", "name": "T社3級強制徴収職職員", "prisoner": "ウーティス", "season": 6, "stars": 3, "keywords": ["振動"], "affiliation": "T社", "ver": 8}, {"id": "1114", "name": "LCAウアジェト先鋒三隊隊長", "prisoner": "ウーティス", "season": 7, "stars": 3, "keywords": ["沈潜", "振動"], "affiliation": "LimbusCompany", "ver": 8}, {"id": "1201", "name": "LCB囚人", "prisoner": "グレゴール", "season": 0, "stars": 1, "keywords": ["破裂"], "affiliation": "LimbusCompany", "ver": 8}, {"id": "1202", "name": "南部リウ協会6課", "prisoner": "グレゴール", "season": 0, "stars": 2, "keywords": ["火傷"], "affiliation": "リウ協会", "ver": 8}, {"id": "1203", "name": "G社課長代理", "prisoner": "グレゴール", "season": 1, "stars": 3, "keywords": ["破裂"], "affiliation": "G社", "ver": 8}, {"id": "1204", "name": "りょ・ミ・パ助手", "prisoner": "グレゴール", "season": 1, "stars": 2, "keywords": ["出血"], "affiliation": "りょ・ミ・パ", "ver": 8}, {"id": "1205", "name": "バラのスパナ工房フィクサー", "prisoner": "グレゴール", "season": 2, "stars": 2, "keywords": ["充電", "破裂"], "affiliation": "バラのスパナ工房", "ver": 8}, {"id": "1206", "name": "南部ツヴァイ協会4課", "prisoner": "グレゴール", "season": 0, "stars": 3, "keywords": [], "affiliation": "ツヴァイ協会", "ver": 10}, {"id": "1207", "name": "双鉤海賊団副船長", "prisoner": "グレゴール", "season": 3, "stars": 3, "keywords": ["出血", "呼吸"], "affiliation": "双鉤海賊団", "ver": 8}, {"id": "1208", "name": "黒雲会副組長", "prisoner": "グレゴール", "season": 3, "stars": 2, "keywords": ["出血"], "affiliation": "黒雲会", "ver": 8}, {"id": "1209", "name": "エドガー家 継承者", "prisoner": "グレゴール", "season": 4, "stars": 3, "keywords": ["沈潜"], "affiliation": "エドガー家", "ver": 8}, {"id": "1210", "name": "ラ・マンチャランド 神父", "prisoner": "グレゴール", "season": 5, "stars": 3, "keywords": ["出血", "破裂"], "affiliation": "ラ・マンチャランド", "ver": 10}, {"id": "1211", "name": "炎拳事務所生存者", "prisoner": "グレゴール", "season": 5, "stars": 3, "keywords": ["火傷"], "affiliation": "炎拳事務所", "ver": 10}, {"id": "1212", "name": "黒獣-巳", "prisoner": "グレゴール", "season": 6, "stars": 3, "keywords": ["呼吸", "破裂"], "affiliation": "H社,黒獣", "ver": 8}, {"id": "1213", "name": "夜の錐カピターノ", "prisoner": "グレゴール", "season": "W", "stars": 3, "keywords": ["出血", "振動"], "affiliation": "夜の錐", "ver": 8}, {"id": "1214", "name": "ロボトミーE.G.O::ランプ", "prisoner": "グレゴール", "season": 7, "stars": 3, "keywords": ["沈潜", "火傷"], "affiliation": "LimbusCompany", "ver": 8}, {"id": "1215", "name": "LCE E.G.O::AEDD", "prisoner": "グレゴール", "season": 7, "stars": 3, "keywords": ["充電", "破裂"], "affiliation": "LimbusCompany", "ver": 8}];
+カイチーム", "prisoner": "ロージャ", "season": 0, "stars": 3, "keywords": ["充電", "沈潜"], "affiliation": "R社", "ver": 8}, {"id": "915", "ver": 10, "name": "薬指野獣派ドーセント", "prisoner": "ロージャ", "season": 7, "stars": 3, "keywords": ["出血", "沈潜"], "affiliation": "薬指"}, {"id": "1001", "name": "LCB囚人", "prisoner": "シンクレア", "season": 0, "stars": 1, "keywords": ["破裂"], "affiliation": "LimbusCompany", "ver": 8}, {"id": "1002", "name": "剣契殺手", "prisoner": "シンクレア", "season": 0, "stars": 3, "keywords": ["呼吸", "出血"], "affiliation": "剣契", "ver": 8}, {"id": "1003", "name": "南部ツヴァイ協会6課", "prisoner": "シンクレア", "season": 0, "stars": 2, "keywords": ["振動"], "affiliation": "ツヴァイ", "ver": 8}, {"id": "1004", "name": "マリアッチボス", "prisoner": "シンクレア", "season": 1, "stars": 2, "keywords": ["呼吸", "沈潜"], "affiliation": "マリアッチ", "ver": 8}, {"id": "1005", "name": "握らんとする者", "prisoner": "シンクレア", "season": 1, "stars": 3, "keywords": ["出血", "火傷"], "affiliation": "N社", "ver": 8}, {"id": "1006", "name": "ロボトミーE.G.O::紅籍", "prisoner": "シンクレア", "season": 2, "stars": 2, "keywords": ["破裂"], "affiliation": "技術開放連合", "ver": 8}, {"id": "1007", "name": "奥歯ボセンターフィクサー", "prisoner": "シンクレア", "season": 2, "stars": 2, "keywords": ["振動"], "affiliation": "奥歯ボートセンター", "ver": 8}, {"id": "1008", "name": "南部センク協会4課部長", "prisoner": "シンクレア", "season": 0, "stars": 3, "keywords": ["呼吸"], "affiliation": "センク協会", "ver": 8}, {"id": "1009", "name": "夜明事務所フィクサー", "prisoner": "シンクレア", "season": "W", "stars": 3, "keywords": ["火傷"], "affiliation": "夜明事務所", "ver": 8}, {"id": "1010", "name": "西部ツヴァイ協会3課", "prisoner": "シンクレア", "season": 5, "stars": 2, "keywords": ["振動"], "affiliation": "ツヴァイ協会", "ver": 8}, {"id": "1011", "name": "北部ヂェーヴィチ協会3課", "prisoner": "シンクレア", "season": 0, "stars": 3, "keywords": ["破裂"], "affiliation": "ヂェーヴィチ協会", "ver": 8}, {"id": "1012", "name": "中指末弟", "prisoner": "シンクレア", "season": 0, "stars": 3, "keywords": ["出血"], "affiliation": "中指", "ver": 8}, {"id": "1013", "name": "東部親指ソルダートII", "prisoner": "シンクレア", "season": 6, "stars": 3, "keywords": ["振動", "火傷"], "affiliation": "親指", "ver": 8}, {"id": "1014", "name": "黒獣-酉", "prisoner": "シンクレア", "season": 6, "stars": 3, "keywords": ["火傷", "破裂"], "affiliation": "H社,黒獣", "ver": 8}, {"id": "1015", "name": "蜘蛛の巣小指の子方", "prisoner": "シンクレア", "season": 7, "stars": 3, "keywords": ["出血", "呼吸"], "affiliation": "蜘蛛の巣", "ver": 8}, {"id": "1101", "name": "LCB囚人", "prisoner": "ウーティス", "season": 0, "stars": 1, "keywords": ["破裂"], "affiliation": "LimbusCompany", "ver": 8}, {"id": "1102", "name": "剣契殺手", "prisoner": "ウーティス", "season": 0, "stars": 2, "keywords": ["呼吸"], "affiliation": "剣契", "ver": 8}, {"id": "1103", "name": "G社部長", "prisoner": "ウーティス", "season": 1, "stars": 2, "keywords": ["沈潜"], "affiliation": "G社", "ver": 8}, {"id": "1104", "name": "南部セブン協会6課部長", "prisoner": "ウーティス", "season": 0, "stars": 3, "keywords": ["破裂"], "affiliation": "セブン協会", "ver": 8}, {"id": "1105", "name": "奥歯事務所フィクサー", "prisoner": "ウーティス", "season": 2, "stars": 3, "keywords": ["振動"], "affiliation": "奥歯事務所", "ver": 8}, {"id": "1106", "name": "南部センク協会4課", "prisoner": "ウーティス", "season": 0, "stars": 2, "keywords": ["呼吸"], "affiliation": "センク協会", "ver": 8}, {"id": "1107", "name": "ロボトミーE.G.O::魔弾", "prisoner": "ウーティス", "season": "W", "stars": 3, "keywords": ["火傷"], "affiliation": "旧L社", "ver": 8}, {"id": "1108", "name": "ワザリング・ハイツチーフバトラー", "prisoner": "ウーティス", "season": 4, "stars": 3, "keywords": ["沈潜"], "affiliation": "ワザリング・ハイツ", "ver": 8}, {"id": "1109", "name": "薬指点描派スチューデント", "prisoner": "ウーティス", "season": 0, "stars": 2, "keywords": ["出血"], "affiliation": "薬指", "ver": 8}, {"id": "1110", "name": "W社3級整理要員チーフ", "prisoner": "ウーティス", "season": 0, "stars": 3, "keywords": ["充電", "破裂"], "affiliation": "W社", "ver": 8}, {"id": "1111", "name": "ラ・マンチャランド 理髪師", "prisoner": "ウーティス", "season": 5, "stars": 3, "keywords": ["出血"], "affiliation": "ラ・マンチャランド", "ver": 8}, {"id": "1112", "name": "黒獣-卯", "prisoner": "ウーティス", "season": 5, "stars": 3, "keywords": ["破裂"], "affiliation": "H社,黒獣", "ver": 8}, {"id": "1113", "name": "T社3級強制徴収職職員", "prisoner": "ウーティス", "season": 6, "stars": 3, "keywords": ["振動"], "affiliation": "T社", "ver": 8}, {"id": "1114", "name": "LCAウアジェト先鋒三隊隊長", "prisoner": "ウーティス", "season": 7, "stars": 3, "keywords": ["沈潜", "振動"], "affiliation": "LimbusCompany", "ver": 8}, {"id": "1201", "name": "LCB囚人", "prisoner": "グレゴール", "season": 0, "stars": 1, "keywords": ["破裂"], "affiliation": "LimbusCompany", "ver": 8}, {"id": "1202", "name": "南部リウ協会6課", "prisoner": "グレゴール", "season": 0, "stars": 2, "keywords": ["火傷"], "affiliation": "リウ協会", "ver": 8}, {"id": "1203", "name": "G社課長代理", "prisoner": "グレゴール", "season": 1, "stars": 3, "keywords": ["破裂"], "affiliation": "G社", "ver": 8}, {"id": "1204", "name": "りょ・ミ・パ助手", "prisoner": "グレゴール", "season": 1, "stars": 2, "keywords": ["出血"], "affiliation": "りょ・ミ・パ", "ver": 8}, {"id": "1205", "name": "バラのスパナ工房フィクサー", "prisoner": "グレゴール", "season": 2, "stars": 2, "keywords": ["充電", "破裂"], "affiliation": "バラのスパナ工房", "ver": 8}, {"id": "1206", "name": "南部ツヴァイ協会4課", "prisoner": "グレゴール", "season": 0, "stars": 3, "keywords": [], "affiliation": "ツヴァイ協会", "ver": 10}, {"id": "1207", "name": "双鉤海賊団副船長", "prisoner": "グレゴール", "season": 3, "stars": 3, "keywords": ["出血", "呼吸"], "affiliation": "双鉤海賊団", "ver": 8}, {"id": "1208", "name": "黒雲会副組長", "prisoner": "グレゴール", "season": 3, "stars": 2, "keywords": ["出血"], "affiliation": "黒雲会", "ver": 8}, {"id": "1209", "name": "エドガー家 継承者", "prisoner": "グレゴール", "season": 4, "stars": 3, "keywords": ["沈潜"], "affiliation": "エドガー家", "ver": 8}, {"id": "1210", "name": "ラ・マンチャランド 神父", "prisoner": "グレゴール", "season": 5, "stars": 3, "keywords": ["出血", "破裂"], "affiliation": "ラ・マンチャランド", "ver": 10}, {"id": "1211", "name": "炎拳事務所生存者", "prisoner": "グレゴール", "season": 5, "stars": 3, "keywords": ["火傷"], "affiliation": "炎拳事務所", "ver": 10}, {"id": "1212", "name": "黒獣-巳", "prisoner": "グレゴール", "season": 6, "stars": 3, "keywords": ["呼吸", "破裂"], "affiliation": "H社,黒獣", "ver": 8}, {"id": "1213", "name": "夜の錐カピターノ", "prisoner": "グレゴール", "season": "W", "stars": 3, "keywords": ["出血", "振動"], "affiliation": "夜の錐", "ver": 8}, {"id": "1214", "name": "ロボトミーE.G.O::ランプ", "prisoner": "グレゴール", "season": 7, "stars": 3, "keywords": ["沈潜", "火傷"], "affiliation": "LimbusCompany", "ver": 8}, {"id": "1215", "name": "LCE E.G.O::AEDD", "prisoner": "グレゴール", "season": 7, "stars": 3, "keywords": ["充電", "破裂"], "affiliation": "LimbusCompany", "ver": 8}];
+
+    const PRISONER_ORDER = ["イサン", "ファウスト", "ドンキホーテ", "良秀", "ムルソー", "ホンル", "ヒースクリフ", "イシュメール", "ロージャ", "シンクレア", "ウーティス", "グレゴール"];
+    const ALL_KW = ['火傷', '出血', '振動', '破裂', '沈潜', '呼吸', '充電'];
+    const NEED = 5;
+    const TEAM_SIZE = 7;
+    const CURRENT_DATA_VER = 10;
+
+    // localStorage keys
+    const LS_CUSTOM = 'limbus_custom_v3';
+    const LS_EDITS = 'limbus_edits_v3';  // ベースデータへの上書き編集
+
+    // ============================================================
+    // セキュリティユーティリティ
+    // ============================================================
+    function escapeHTML(str) {
+      if (str == null) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    // ============================================================
+    // データ管理
+    // ============================================================
+    function loadCustom() {
+      try {
+        const raw = localStorage.getItem(LS_CUSTOM);
+        const data = raw ? JSON.parse(raw) : [];
+        return Array.isArray(data) ? data : [];
+      } catch { return []; }
+    }
+    function saveCustom(a) {
+      try { localStorage.setItem(LS_CUSTOM, JSON.stringify(a)); }
+      catch (e) { console.warn('saveCustom failed:', e); }
+    }
+    function loadEdits() {
+      try {
+        const raw = localStorage.getItem(LS_EDITS);
+        const data = raw ? JSON.parse(raw) : {};
+        return (data && typeof data === 'object' && !Array.isArray(data)) ? data : {};
+      } catch { return {}; }
+    }
+    function saveEdits(o) {
+      try { localStorage.setItem(LS_EDITS, JSON.stringify(o)); }
+      catch (e) { console.warn('saveEdits failed:', e); }
+    }
+
+    function getAllPersonas() {
+      const edits = loadEdits();
+      // ベースデータ＋編集上書き
+      // ソース側の ver がユーザー編集の ver を「上回っている」場合は必ずソースを優先する。
+      // これにより、ページ更新でデータが変化した人格は自動的にソース値に追従する。
+      // ユーザーが意図的に編集した場合（edit.ver が p.ver 以上）は引き続きユーザー値が優先。
+      const base = BUILTIN_PERSONAS
+        .filter(p => !edits[p.id]?.__deleted)
+        .map(p => {
+          const edit = edits[p.id];
+          if (!edit) return p;
+          // ユーザー編集のverがソースのverより小さい = データが更新済み → ソース優先
+          if ((edit.ver || 0) < (p.ver || 0)) return p;
+          // ユーザー編集のverがソースのver以上 = ユーザーが意図的に編集 → ユーザー優先
+          return { ...p, ...edit };
+        });
+      return [...base, ...loadCustom()];
+    }
+
+    // 人格の優先度スコア（IDが大きいほど新しい＝高スコア）
+    function personaPriority(p) {
+      if (typeof p.id === 'string' && p.id.startsWith('c')) {
+        // カスタム追加：その囚人の既存最大ID + カスタム追加順
+        const allPersonas = getAllPersonas();
+        const prisonerBaseIds = allPersonas
+          .filter(x => x.prisoner === p.prisoner && !String(x.id).startsWith('c'))
+          .map(x => parseInt(x.id) || 0);
+        const maxBaseId = prisonerBaseIds.length > 0 ? Math.max(...prisonerBaseIds) : 0;
+        // カスタム同士の順番はタイムスタンプ部分で決める
+        const customOrder = parseInt(p.id.replace('c', '')) || 0;
+        // 同囚人カスタムの中での順番（小さいほど先に追加）
+        const prisonerCustoms = allPersonas
+          .filter(x => x.prisoner === p.prisoner && String(x.id).startsWith('c'))
+          .map(x => parseInt(x.id.replace('c', '')) || 0)
+          .sort((a, b) => a - b);
+        const customRank = prisonerCustoms.indexOf(customOrder);
+        return maxBaseId + customRank + 1;
+      }
+      return parseInt(p.id) || 0;
+    }
+
+    // ============================================================
+    // UI初期化
+    // ============================================================
+    // ============================================================
+    // UIデータ初期化（キーワード・アンカー等）
+    // ============================================================
+    let selectedKw = new Set();
+    // ※ kwGrid等の初期化はファイル末尾の新しいロジックで行われます
+
+
+    // ============================================================
+    // ビットマスク設定
+    // ============================================================
+    const KW_BIT = {};
+    ALL_KW.forEach((kw, i) => KW_BIT[kw] = 1 << i);
+
+    function kwsToBits(keywords) {
+      let bits = 0;
+      for (const kw of keywords) if (KW_BIT[kw] !== undefined) bits |= KW_BIT[kw];
+      return bits;
+    }
+
+    // persona に bits フィールドを付与（起動時1回だけ）
+    function attachBits(personas) {
+      for (const p of personas) p._bits = kwsToBits(p.keywords);
+    }
+
+    // targetKw の各KWに対する "持っている人数" をビット演算でカウント
+    function countBits(team, kwBit) {
+      let cnt = 0;
+      for (const p of team) if (p._bits & kwBit) cnt++;
+      return cnt;
+    }
+
+    // ============================================================
+    // メインKWセレクト更新
+    // ============================================================
+    function updateMainKwSelect() {
+      const sel = document.getElementById('mainKwSelect');
+      const prev = sel.value;
+      sel.innerHTML = '<option value="">なし</option>';
+      for (const kw of selectedKw) {
+        const opt = new Option(kw, kw);
+        sel.appendChild(opt);
+      }
+      if ([...selectedKw].includes(prev)) sel.value = prev;
+    }
+
+    // ============================================================
+    // チーム構築ロジック（ビットマスク版）
+    // ============================================================
+    function pickBestFrom(pool, targetBits, kwList, multiMode) {
+      return pool.reduce((best, c) => {
+        const sc = popcount(c._bits & targetBits);
+        const sb = popcount(best._bits & targetBits);
+        if (sc !== sb) return sc > sb ? c : best;
+        if (multiMode) {
+          const mc = popcount(c._bits), mb = popcount(best._bits);
+          if (mc !== mb) return mc > mb ? c : best;
+        }
+        return personaPriority(c) > personaPriority(best) ? c : best;
+      });
+    }
+
+    function popcount(x) {
+      // ビット数を数える
+      x = x - ((x >> 1) & 0x55555555);
+      x = (x & 0x33333333) + ((x >> 2) & 0x33333333);
+      return (((x + (x >> 4)) & 0x0f0f0f0f) * 0x01010101) >> 24;
+    }
+
+    function canSatisfy(pools, targetKwBits) {
+      // 各KWビットについて、そのKWを持てる囚人数 >= NEED か確認
+      let remaining = targetKwBits;
+      while (remaining) {
+        const bit = remaining & (-remaining); // lowest set bit
+        let cnt = 0;
+        for (const pool of pools) {
+          if (pool.some(p => p._bits & bit)) cnt++;
+        }
+        if (cnt < NEED) return false;
+        remaining &= remaining - 1;
+      }
+      return true;
+    }
+
+    function buildTeam(pools, targetKwBits, kwList, multiMode) {
+      const n = pools.length;
+      const team = new Array(n).fill(null);
+
+      // 各KWビットについて貢献できるpool indexリスト（貢献者数でソート）
+      const kwEntries = [];
+      let tmp = targetKwBits;
+      while (tmp) {
+        const bit = tmp & (-tmp);
+        const contribs = pools
+          .map((pool, i) => pool.some(p => p._bits & bit) ? i : -1)
+          .filter(i => i >= 0);
+        kwEntries.push({ bit, contribs });
+        tmp &= tmp - 1;
+      }
+      kwEntries.sort((a, b) => a.contribs.length - b.contribs.length);
+
+      for (const { bit, contribs } of kwEntries) {
+        let assigned = team.filter(p => p && (p._bits & bit)).length;
+        if (assigned >= NEED) continue;
+        // 未割り当て優先でソート
+        const targets = [...contribs].sort(
+          (a, b) => (team[a] !== null ? 1 : 0) - (team[b] !== null ? 1 : 0)
+        );
+        for (const i of targets) {
+          if (assigned >= NEED) break;
+          if (team[i] && (team[i]._bits & bit)) continue;
+          const alts = pools[i].filter(p => p._bits & bit);
+          if (!alts.length) continue;
+          team[i] = pickBestFrom(alts, targetKwBits, kwList, multiMode);
+          assigned++;
+        }
+      }
+
+      for (let i = 0; i < n; i++) {
+        if (!team[i]) team[i] = pickBestFrom(pools[i], targetKwBits, kwList, multiMode);
+      }
+      return team;
+    }
+
+    function scoreTeam(team, targetKw) {
+      const counts = {};
+      for (const kw of targetKw) counts[kw] = 0;
+      for (const p of team) for (const kw of p.keywords) if (counts[kw] !== undefined) counts[kw]++;
+      let total = 0, satisfied = 0;
+      for (const kw of targetKw) {
+        total += Math.min(counts[kw], NEED);
+        if (counts[kw] >= NEED) satisfied++;
+      }
+      return { total, satisfied, counts };
+    }
+
+    function bonusKwList(team, targetKw) {
+      const counts = {};
+      for (const kw of ALL_KW) counts[kw] = 0;
+      for (const p of team) for (const kw of p.keywords) counts[kw]++;
+      return ALL_KW
+        .filter(kw => !targetKw.includes(kw) && counts[kw] >= NEED)
+        .map(kw => ({ kw, count: counts[kw] }));
+    }
+
+    function bonusKwCount(team, targetKw) {
+      return bonusKwList(team, targetKw).length;
+    }
+
+    function isValid(team, targetKw) {
+      return scoreTeam(team, targetKw).satisfied === targetKw.length;
+    }
+
+    function combinations(arr, k) {
+      if (k === 0) return [[]];
+      if (arr.length === 0) return [];
+      const [first, ...rest] = arr;
+      return [...combinations(rest, k - 1).map(c => [first, ...c]), ...combinations(rest, k)];
+    }
+
+    function search() {
+      const PERSONAS = getAllPersonas();
+      attachBits(PERSONAS);
+
+      // アンカー（固定枠）1〜3
+      const anchorIds = [1, 2, 3].map(n => document.getElementById(`anchorPersonaSelect${n}`).value);
+      let anchors = anchorIds.map(id => id ? PERSONAS.find(p => p.id === id) : null).filter(Boolean);
+
+      // 同囚人チェック
+      const anchorPrisoners = anchors.map(a => a.prisoner);
+      if (new Set(anchorPrisoners).size !== anchorPrisoners.length) {
+        document.getElementById('status').textContent = '同じ囚人の人格を複数アンカーにすることはできません';
+        return;
+      }
+
+      // 除外設定1〜2
+      const antiConfigs = [1, 2].map(n => ({
+        prisoner: document.getElementById(`antiAnchorPrisonerSelect${n}`).value,
+        id: document.getElementById(`antiAnchorPersonaSelect${n}`).value,
+      }));
+
+      let targetKw = [...selectedKw];
+      if (anchors.length > 0 && targetKw.length === 0) {
+        const kwSet = new Set();
+        anchors.forEach(a => a.keywords.forEach(kw => kwSet.add(kw)));
+        targetKw = [...kwSet];
+      }
+
+      if (targetKw.length === 0) {
+        document.getElementById('status').textContent = anchors.length > 0
+          ? '指定したアンカー人格にキーワードが全く設定されていません'
+          : 'キーワードを1つ以上選ぶか、固定枠（アンカー）を指定してください';
+        return;
+      }
+
+      const mainKw = document.getElementById('mainKwSelect').value;
+      const multiMode = document.getElementById('multiKwToggle').checked;
+      const useJackpotHighlight = document.getElementById('jackpotHighlightToggle').checked;
+      const maxResults = parseInt(document.getElementById('maxResultsSelect').value) || 10;
+
+      document.getElementById('runBtn').disabled = true;
+      document.getElementById('status').textContent = '探索中...';
+      document.getElementById('results').innerHTML = '';
+
+      setTimeout(() => {
+        const byPrisoner = {};
+        for (const p of PERSONAS) {
+          if (!p.prisoner) continue;
+          // 除外チェック
+          let skip = false;
+          for (const anti of antiConfigs) {
+            if (!anti.prisoner) continue;
+            if (anti.id && p.id === anti.id) { skip = true; break; }
+            if (!anti.id && p.prisoner === anti.prisoner) { skip = true; break; }
+          }
+          if (skip) continue;
+          if (!byPrisoner[p.prisoner]) byPrisoner[p.prisoner] = [];
+          byPrisoner[p.prisoner].push(p);
+        }
+        const prisoners = Object.keys(byPrisoner);
+
+        const anchorPrisonerNames = anchors.map(a => a.prisoner);
+        const otherPrisoners = prisoners.filter(pr => !anchorPrisonerNames.includes(pr));
+        const combos = combinations(otherPrisoners, TEAM_SIZE - anchors.length)
+          .map(c => [...anchorPrisonerNames, ...c]);
+
+        // ビットマスク化
+        const targetKwBits = kwsToBits(targetKw);
+        const mainKwBit = mainKw ? KW_BIT[mainKw] : 0;
+
+        let searchSets = [{ kw: targetKw, bits: targetKwBits }];
+        if (multiMode) {
+          for (const kw of ALL_KW) {
+            if (!targetKw.includes(kw)) {
+              const extra = [...targetKw, kw];
+              searchSets.push({ kw: extra, bits: kwsToBits(extra) });
+            }
+          }
+          for (let i = 0; i < ALL_KW.length; i++) {
+            for (let j = i + 1; j < ALL_KW.length; j++) {
+              if (!targetKw.includes(ALL_KW[i]) && !targetKw.includes(ALL_KW[j])) {
+                const extra = [...targetKw, ALL_KW[i], ALL_KW[j]];
+                searchSets.push({ kw: extra, bits: kwsToBits(extra) });
+              }
+            }
+          }
+        }
+
+        const found = [];
+        const foundTeamKeys = new Set();
+
+        for (const { kw: searchKw, bits: searchBits } of searchSets) {
+          for (const chosen7 of combos) {
+            const pools = chosen7.map(pr => {
+              const anchorMatch = anchors.find(a => a.prisoner === pr);
+              return anchorMatch ? [anchorMatch] : byPrisoner[pr];
+            });
+
+            if (!canSatisfy(pools, targetKwBits)) continue;
+
+            const team = buildTeam(pools, searchBits, searchKw, multiMode);
+            if (!isValid(team, targetKw)) continue;
+
+            const key = team.map(p => p.id).sort().join(',');
+            if (foundTeamKeys.has(key)) continue;
+            foundTeamKeys.add(key);
+
+            const sc = scoreTeam(team, targetKw);
+            const bonusCount = multiMode ? bonusKwCount(team, targetKw) : 0;
+            const bonusList = multiMode ? bonusKwList(team, targetKw) : [];
+            // メインKWの人数
+            const mainKwCnt = mainKwBit ? team.filter(p => p._bits & mainKwBit).length : 0;
+            const sortedTeam = [...team].sort((a, b) =>
+              PRISONER_ORDER.indexOf(a.prisoner) - PRISONER_ORDER.indexOf(b.prisoner)
+            );
+            found.push({ team: sortedTeam, sc, bonusCount, bonusList, mainKwCnt });
+          }
+        }
+
+        // ソート: メインKW人数 → ジャックポット → satisfied → bonus → total
+        const compareFn = (a, b) => {
+          if (mainKwBit) {
+            if (b.mainKwCnt !== a.mainKwCnt) return b.mainKwCnt - a.mainKwCnt;
+          }
+          const aTotalKw = a.sc.satisfied + a.bonusCount;
+          const bTotalKw = b.sc.satisfied + b.bonusCount;
+          
+          if (useJackpotHighlight) {
+            const aIsJackpot = aTotalKw >= 3, bIsJackpot = bTotalKw >= 3;
+            if (aIsJackpot !== bIsJackpot) return bIsJackpot - aIsJackpot;
+          }
+          
+          if (b.sc.satisfied !== a.sc.satisfied) return b.sc.satisfied - a.sc.satisfied;
+
+          if (multiMode) {
+            let aB = a.bonusCount, bB = b.bonusCount;
+            if (!useJackpotHighlight) {
+              // 強調オフ時は「合計2属性（1つ目のボーナス）」までを評価対象とし、3つ目以降による優先は行わない
+              aB = Math.min(aB, Math.max(0, 2 - a.sc.satisfied));
+              bB = Math.min(bB, Math.max(0, 2 - b.sc.satisfied));
+            }
+            if (bB !== aB) return bB - aB;
+          }
+          return b.sc.total - a.sc.total;
+        };
+
+        // グループ化による多様性確保
+        const groups = {};
+        for (const res of found) {
+          const sig = res.bonusList.map(b => b.kw).sort().join(',');
+          if (!groups[sig]) groups[sig] = [];
+          groups[sig].push(res);
+        }
+        const groupKeys = Object.keys(groups);
+        for (const k of groupKeys) groups[k].sort(compareFn);
+        groupKeys.sort((k1, k2) => compareFn(groups[k1][0], groups[k2][0]));
+
+        const finalResults = [];
+        let idx = 0;
+        while (finalResults.length < maxResults) {
+          let added = false;
+          for (const k of groupKeys) {
+            if (finalResults.length >= maxResults) break;
+            if (groups[k][idx]) { finalResults.push(groups[k][idx]); added = true; }
+          }
+          if (!added) break;
+          idx++;
+        }
+        finalResults.sort(compareFn);
+
+        renderResults(finalResults, targetKw, multiMode, useJackpotHighlight, mainKw);
+        document.getElementById('runBtn').disabled = false;
+        document.getElementById('status').textContent = found.length > 0
+          ? `${found.length}件の有効編成が見つかりました（上位${Math.min(found.length, maxResults)}件表示）`
+          : '条件を満たす編成が見つかりませんでした。キーワードを減らしてお試しください。';
+      }, 30);
+    }
+
+    // ============================================================
+    // 結果描画
+    // ============================================================
+    // ※ renderResults(), toggleCard() はファイル末尾の新しいロジックを使用します
+
+
+    // ============================================================
+    // 人格追加
+    // ============================================================
+    function addPersona() {
+      const prisoner = document.getElementById('f-prisoner').value;
+      const name = document.getElementById('f-name').value.trim();
+      const stars = parseInt(document.getElementById('f-stars').value);
+      const seasonRaw = document.getElementById('f-season').value.trim();
+      const season = seasonRaw.toUpperCase() === 'W' ? 'W' : (parseInt(seasonRaw) || 0);
+      const affiliation = document.getElementById('f-affiliation').value.trim();
+      const keywords = [...addKwSet];
+
+      if (!prisoner) { alert('囚人名を選択してください'); return; }
+      if (!name) { alert('人格名を入力してください'); return; }
+
+      const custom = loadCustom();
+      const id = 'c' + Date.now();
+      custom.push({ id, name, prisoner, season, stars, keywords, affiliation, custom: true });
+      saveCustom(custom);
+
+      // reset
+      document.getElementById('f-prisoner').value = '';
+      document.getElementById('f-name').value = '';
+      document.getElementById('f-stars').value = '3';
+      document.getElementById('f-season').value = '';
+      document.getElementById('f-affiliation').value = '';
+      addKwSet.clear();
+      document.querySelectorAll('#kwChecksAdd .kw-check-btn').forEach(b => b.classList.remove('on'));
+
+      alert(`「${prisoner} - ${name}」を追加しました`);
+    }
+
+    // ============================================================
+    // エクスポート / インポート
+    // ============================================================
+    function exportData() {
+      const custom = loadCustom();
+      if (custom.length === 0) { alert('追加された人格がありません'); return; }
+      const blob = new Blob([JSON.stringify(custom, null, 2)], { type: 'application/json' });
+      const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'limbus_custom.json'; a.click();
+    }
+    function importData(input) {
+      const file = input.files[0]; if (!file) return;
+      if (!file.name.endsWith('.json')) { alert('JSONファイルを選択してください'); input.value = ''; return; }
+      if (file.size > 1024 * 1024) { alert('ファイルサイズが大きすぎます（上限1MB）'); input.value = ''; return; }
+      const reader = new FileReader();
+      reader.onload = e => {
+        try {
+          const data = JSON.parse(e.target.result);
+          if (!Array.isArray(data)) throw new Error('配列形式ではありません');
+          // 各エントリの基本検証
+          const VALID_KW = new Set(['火傷','出血','振動','破裂','沈潜','呼吸','充電']);
+          const VALID_PRISONERS = new Set(PRISONER_ORDER);
+          const validated = data.filter(p => {
+            if (!p || typeof p !== 'object') return false;
+            if (!p.name || typeof p.name !== 'string') return false;
+            if (!VALID_PRISONERS.has(p.prisoner)) return false;
+            if (!Array.isArray(p.keywords)) return false;
+            if (!p.keywords.every(k => VALID_KW.has(k))) return false;
+            return true;
+          });
+          if (validated.length === 0) { alert('有効なデータがありませんでした'); return; }
+          const existing = loadCustom();
+          const ids = new Set(existing.map(p => p.id));
+          const toAdd = validated.filter(p => !ids.has(p.id));
+          saveCustom([...existing, ...toAdd]);
+          const skipped = data.length - validated.length;
+          alert(`${toAdd.length}件インポートしました${skipped > 0 ? `（${skipped}件は検証エラーでスキップ）` : ''}`);
+          renderDB();
+        } catch(err) { alert('ファイル形式エラー: ' + err.message); }
+        input.value = '';
+      };
+      reader.onerror = () => { alert('ファイル読み込みエラー'); input.value = ''; };
+      reader.readAsText(file);
+    }
+
+    // ============================================================
+    // DB編集
+    // ============================================================
+    // ※ renderDB() はファイル末尾の新しいロジックを使用します
+
+
+    function openEdit(id) {
+      const all = getAllPersonas();
+      const p = all.find(x => x.id === id);
+      if (!p) return;
+
+      document.getElementById('edit-id').value = id;
+      document.getElementById('edit-prisoner').value = p.prisoner;
+      document.getElementById('edit-name').value = p.name;
+      document.getElementById('edit-stars').value = p.stars;
+      document.getElementById('edit-season').value = p.season;
+      document.getElementById('edit-affiliation').value = p.affiliation || '';
+
+      editKwSet.clear();
+      document.querySelectorAll('#kwChecksEdit .kw-check-btn').forEach(b => {
+        b.classList.remove('on');
+        if (p.keywords.includes(b.textContent)) { editKwSet.add(b.textContent); b.classList.add('on'); }
+      });
+
+      document.getElementById('editModal').classList.add('open');
+    }
+
+    function closeModal() { document.getElementById('editModal').classList.remove('open'); }
+
+    function saveEdit() {
+      const id = document.getElementById('edit-id').value;
+      const prisoner = document.getElementById('edit-prisoner').value;
+      const name = document.getElementById('edit-name').value.trim();
+      const stars = parseInt(document.getElementById('edit-stars').value);
+      const seasonRaw = document.getElementById('edit-season').value.trim();
+      const season = seasonRaw.toUpperCase() === 'W' ? 'W' : (parseInt(seasonRaw) || 0);
+      const affiliation = document.getElementById('edit-affiliation').value.trim();
+      const keywords = [...editKwSet];
+
+      if (!name) { alert('人格名を入力してください'); return; }
+
+      // カスタムかベースかで保存先を変える
+      const custom = loadCustom();
+      const ci = custom.findIndex(p => p.id === id);
+      if (ci >= 0) {
+        custom[ci] = { ...custom[ci], prisoner, name, stars, season, affiliation, keywords };
+        saveCustom(custom);
+      } else {
+        // ベースデータへの編集はeditsに保存
+        const edits = loadEdits();
+        const p = BUILTIN_PERSONAS.find(x => x.id === id);
+        // ユーザー編集には現在のデータバージョンを記録する。
+        // 将来ソース側のverが上がった場合、その人格の編集は自動的にソース値にリセットされる。
+        edits[id] = { prisoner, name, stars, season, affiliation, keywords, ver: CURRENT_DATA_VER };
+        saveEdits(edits);
+      }
+
+      closeModal();
+      renderDB();
+    }
+
+    function deletePersona(id, type) {
+      if (!confirm('この人格を削除しますか？')) return;
+      if (type === 'custom') {
+        saveCustom(loadCustom().filter(p => p.id !== id));
+      } else {
+        const edits = loadEdits();
+        edits[id] = { __deleted: true };
+        saveEdits(edits);
+      }
+      renderDB();
+    }
+
+    function resetBaseData() {
+      if (!confirm('ベースデータへの編集・削除をすべてリセットしますか？\n（追加した人格は残ります）')) return;
+      localStorage.removeItem(LS_EDITS);
+      renderDB();
+    }
+
+    // モーダル外クリックで閉じる
+    document.getElementById('editModal').addEventListener('click', e => {
+      if (e.target === e.currentTarget) closeModal();
+    });
+
+    // ============================================================
+    // ライト/ダークモード切替
+    // ============================================================
+    // ※ テーマ切替・復元はファイル末尾の新ロジックを使用
+
+
+    // ====== KWカラーマップ ======
+    const KW_COLORS = {
+      '火傷': 'var(--kw-火傷)', '出血': 'var(--kw-出血)', '振動': 'var(--kw-振動)',
+      '破裂': 'var(--kw-破裂)', '沈潜': 'var(--kw-沈潜)', '呼吸': 'var(--kw-呼吸)', '充電': 'var(--kw-充電)'
+    };
+    const KW_BG = {
+      '火傷': 'var(--kw-火傷-bg)', '出血': 'var(--kw-出血-bg)', '振動': 'var(--kw-振動-bg)',
+      '破裂': 'var(--kw-破裂-bg)', '沈潜': 'var(--kw-沈潜-bg)', '呼吸': 'var(--kw-呼吸-bg)', '充電': 'var(--kw-充電-bg)'
+    };
+    function kwStyle(kw) {
+      return `style="--kw-col:${KW_COLORS[kw] || 'var(--c-sub)'};--kw-col-bg:${KW_BG[kw] || 'var(--c-raise)'}"`;
+    }
+
+    // ====== KWチップ描画（検索用）======
+    const kwGrid = document.getElementById('kwGrid');
+    for (const kw of ALL_KW) {
+      const btn = document.createElement('button');
+      btn.className = 'kw-chip';
+      btn.textContent = kw;
+      btn.setAttribute('style', `--kw-col:${KW_COLORS[kw]};--kw-col-bg:${KW_BG[kw]}`);
+      btn.onclick = () => {
+        if (selectedKw.has(kw)) { selectedKw.delete(kw); btn.classList.remove('on'); }
+        else { selectedKw.add(kw); btn.classList.add('on'); }
+        updateMainKwSelect();
+      };
+      kwGrid.appendChild(btn);
+    }
+
+    // ====== アンカー囚人セレクト ======
+    for (const pr of PRISONER_ORDER) {
+      document.getElementById('anchorPrisonerSelect1').appendChild(new Option(pr, pr));
+      document.getElementById('anchorPrisonerSelect2').appendChild(new Option(pr, pr));
+      document.getElementById('anchorPrisonerSelect3').appendChild(new Option(pr, pr));
+      document.getElementById('antiAnchorPrisonerSelect1').appendChild(new Option(pr, pr));
+      document.getElementById('antiAnchorPrisonerSelect2').appendChild(new Option(pr, pr));
+    }
+
+    function updateAnchorPersonaList(slot) {
+      const isAnti = String(slot).startsWith('Anti');
+      const prId = isAnti ? `antiAnchorPrisonerSelect${slot.replace('Anti','')}` : `anchorPrisonerSelect${slot}`;
+      const psId = isAnti ? `antiAnchorPersonaSelect${slot.replace('Anti','')}` : `anchorPersonaSelect${slot}`;
+      const pr = document.getElementById(prId).value;
+      const pSelect = document.getElementById(psId);
+      pSelect.innerHTML = `<option value="">-- ${isAnti ? '人格を特定しない（囚人自体を除外）' : '人格を選択'} --</option>`;
+      if (!pr) return;
+      const all = getAllPersonas();
+      const filtered = all.filter(p => p.prisoner === pr)
+        .sort((a, b) => personaPriority(b) - personaPriority(a));
+      for (const p of filtered) {
+        const opt = document.createElement('option');
+        opt.value = p.id;
+        opt.textContent = `★${p.stars} ${p.name}`;
+        pSelect.appendChild(opt);
+      }
+    }
+
+    function resetAnchor(slot) {
+      const isAnti = String(slot).startsWith('Anti');
+      const num = String(slot).replace('Anti', '');
+      const prId = isAnti ? `antiAnchorPrisonerSelect${num}` : `anchorPrisonerSelect${slot}`;
+      const psId = isAnti ? `antiAnchorPersonaSelect${num}` : `anchorPersonaSelect${slot}`;
+      document.getElementById(prId).value = '';
+      document.getElementById(psId).innerHTML = `<option value="">-- ${isAnti ? '人格を特定しない（囚人自体を除外）' : '人格を選択'} --</option>`;
+    }
+
+    // ====== KWチェック（フォーム用）======
+    function buildKwChecks(containerId, stateSet) {
+      const el = document.getElementById(containerId);
+      for (const kw of ALL_KW) {
+        const btn = document.createElement('button');
+        btn.className = 'kw-check-btn';
+        btn.textContent = kw;
+        btn.type = 'button';
+        btn.setAttribute('style', `--kw-col:${KW_COLORS[kw]};--kw-col-bg:${KW_BG[kw]}`);
+        btn.onclick = () => {
+          if (stateSet.has(kw)) { stateSet.delete(kw); btn.classList.remove('on'); }
+          else { stateSet.add(kw); btn.classList.add('on'); }
+        };
+        el.appendChild(btn);
+      }
+    }
+    const addKwSet = new Set();
+    buildKwChecks('kwChecksAdd', addKwSet);
+    const editKwSet = new Set();
+    buildKwChecks('kwChecksEdit', editKwSet);
+
+    // ====== タブ切替 ======
+    function switchTab(name) {
+      document.querySelectorAll('.page').forEach(el => el.classList.remove('active'));
+      document.querySelectorAll('.nav-tab').forEach(el => el.classList.remove('active'));
+      document.getElementById('page-' + name).classList.add('active');
+      const idx = { search: 0, complete: 1, add: 2, db: 3 }[name];
+      document.querySelectorAll('.nav-tab')[idx].classList.add('active');
+    }
+
+    // ====== 設定折りたたみ ======
+    function toggleSettings(btn) {
+      const body = document.getElementById('settingsBody');
+      const open = body.style.display !== 'none';
+      body.style.display = open ? 'none' : 'block';
+      btn.textContent = open ? '▼ 展開する' : '▲ 折りたたむ';
+    }
+
+    function toggleAnchor(btn) {
+      const body = document.getElementById('anchorBody');
+      const open = body.style.display !== 'none';
+      body.style.display = open ? 'none' : 'block';
+      btn.textContent = open ? '▼ 展開する' : '▲ 折りたたむ';
+    }
+
+    // ====== 結果描画 ======
+    function renderResults(found, targetKw, multiMode, useJackpot, mainKw) {
+      const container = document.getElementById('results');
+      if (!found.length) {
+        container.innerHTML = '<div style="text-align:center;padding:32px;color:var(--c-sub);font-size:13px">条件を満たす編成が見つかりませんでした</div>';
+        return;
+      }
+      let html = `<div class="result-sec"><div class="sec-head"><span class="sec-label">結果</span><span class="result-count">${found.length}件</span></div>`;
+      found.forEach((res, i) => {
+        const isJackpot = (res.sc.satisfied + res.bonusCount) >= 3;
+        const jp = isJackpot && useJackpot;
+        const mainChip = mainKw && res.mainKwCnt >= NEED
+          ? `<span class="t-chip" ${kwStyle(mainKw)} style="border:2px solid gold;font-weight:900;">★${mainKw} ${res.mainKwCnt}/7</span>`
+          : mainKw && res.mainKwCnt > 0
+          ? `<span class="t-chip" ${kwStyle(mainKw)}>★${mainKw} ${res.mainKwCnt}/7</span>`
+          : '';
+        const hasMain = mainChip !== '';
+        const chips = targetKw
+          .filter(kw => !(hasMain && kw === mainKw))
+          .map(kw => {
+            const cnt = res.sc.counts[kw];
+            return `<span class="t-chip${cnt >= NEED ? ' ok' : ''}" ${kwStyle(kw)}>${kw} ${cnt}/${NEED}</span>`;
+          }).join('');
+        const displayedCount = (hasMain ? 1 : 0) + targetKw.filter(kw => !(hasMain && kw === mainKw)).length;
+        const bonusChipsList = useJackpot
+          ? res.bonusList
+          : res.bonusList.slice(0, Math.max(0, 2 - displayedCount));
+        const bonusChips = bonusChipsList.map(b =>
+          `<span class="t-chip bonus" ${kwStyle(b.kw)}>+${b.kw} ${b.count}/${NEED}</span>`
+        ).join('');
+        const jpTag = jp ? `<span class="jackpot-tag">RICH</span>` : '';
+        const rows = res.team.map(p => {
+          const sc = p.stars === 3 ? 's3' : p.stars === 2 ? 's2' : 's1';
+          const isW = String(p.season).toUpperCase() === 'W';
+          const wTag = isW ? `<span class="w-tag">W</span>` : '';
+          const kws = p.keywords.map(kw => {
+            const matched = targetKw.includes(kw) || res.bonusList.some(b => b.kw === kw);
+            return `<span class="p-kw${matched ? ' matched' : ''}" ${kwStyle(kw)}>${kw}</span>`;
+          }).join('');
+          return `<div class="p-row">
+        <span class="p-prisoner">${p.prisoner}</span>
+        <span class="p-name">${p.name}${wTag}</span>
+        <span class="p-stars ${sc}">${'★'.repeat(p.stars)}</span>
+        <div class="p-kws">${kws || '<span style="font-size:11px;color:var(--c-muted)">なし</span>'}</div>
+      </div>`;
+        }).join('');
+        html += `<div class="team-block${i === 0 ? ' open' : ''}${jp ? ' jackpot' : ''}">
+      <div class="team-head" onclick="this.parentElement.classList.toggle('open')">
+        <span class="team-idx">${jpTag} #${i + 1}</span>
+        <div class="team-chips">${mainChip}${chips}${bonusChips}</div>
+        <span class="team-caret">▼</span>
+      </div>
+      <div class="team-body">${rows}</div>
+    </div>`;
+      });
+      html += '</div>';
+      container.innerHTML = html;
+    }
+
+    function toggleCard(h) { h.parentElement.classList.toggle('open'); }
+
+    // ====== DB描画 ======
+    function renderDB() {
+      const q = document.getElementById('dbSearch').value.toLowerCase();
+      const filterPr = document.getElementById('dbFilterPrisoner').value;
+      const filterKw = document.getElementById('dbFilterKw').value;
+      const all = getAllPersonas();
+      const edits = loadEdits();
+      const filtered = all.filter(p => {
+        if (filterPr && p.prisoner !== filterPr) return false;
+        if (filterKw && !p.keywords.includes(filterKw)) return false;
+        if (q && !p.name.toLowerCase().includes(q) && !p.prisoner.toLowerCase().includes(q)) return false;
+        return true;
+      });
+      const tbody = document.getElementById('dbBody');
+      tbody.innerHTML = filtered.map(p => {
+        const isW = String(p.season).toUpperCase() === 'W';
+        const wB = isW ? `<span class="badge badge-w">W</span>` : '';
+        const cB = p.custom ? `<span class="badge badge-custom">追加</span>` : '';
+        const eB = (edits[p.id] && !edits[p.id].__deleted) ? `<span class="badge badge-edited">編集済</span>` : '';
+        return `<tr>
+      <td>${p.prisoner}</td>
+      <td>${p.name}${wB}${cB}${eB}</td>
+      <td>${'★'.repeat(p.stars)}</td>
+      <td>${p.season}</td>
+      <td>${p.keywords.join('・') || 'なし'}</td>
+      <td><button class="tbl-edit" onclick="openEdit('${p.id}')">編集</button><button class="tbl-del" onclick="deletePersona('${p.id}','${p.custom ? 'custom' : 'base'}')">削除</button></td>
+    </tr>`;
+      }).join('');
+      document.getElementById('dbStats').textContent = `${filtered.length} / ${all.length}`;
+    }
+
+    // ====== テーマ ======
+    function toggleTheme() {
+      const lm = document.body.classList.toggle('lm');
+      document.getElementById('themeBtn').textContent = lm ? 'ダーク' : 'ライト';
+      localStorage.setItem('limbus_theme', lm ? 'light' : 'dark');
+    }
+    (function () {
+      if (localStorage.getItem('limbus_theme') === 'light') {
+        document.body.classList.add('lm');
+        document.getElementById('themeBtn').textContent = 'ダーク';
+      }
+    })();
+
+    // ============================================================
+    // 完全網羅検索ロジック
+    // ============================================================
+
+    // 枝刈りDFS + ビットパターンユニーク化による高速完全網羅
+    // チームを列挙せず、カウントと人格採用数だけ追跡する
+    function exhaustiveCheck(targetKw) {
+      const PERSONAS = getAllPersonas();
+      attachBits(PERSONAS);
+      const targetBits = kwsToBits(targetKw);
+      const kwBits = targetKw.map(kw => KW_BIT[kw]);
+      const n = kwBits.length;
+
+      const byPr = {};
+      for (const p of PERSONAS) {
+        if (!p.prisoner) continue;
+        if (!byPr[p.prisoner]) byPr[p.prisoner] = [];
+        byPr[p.prisoner].push(p);
+      }
+      const prs = Object.keys(byPr);
+      const combos7 = combinations(prs, TEAM_SIZE);
+
+      // 囚人ごとに「対象KW貢献ビット → 代表人格」マップをプリコンピュート
+      const prReps = {};
+      for (const pr of prs) {
+        const pb = {};
+        for (const p of byPr[pr]) {
+          const k = p._bits & targetBits;
+          if (!pb[k] || personaPriority(p) > personaPriority(pb[k].rep)) pb[k] = { bits: k, rep: p };
+        }
+        prReps[pr] = Object.values(pb);
+      }
+
+      let totalValid = 0;
+      const personaCount = {};
+      const counts = new Array(n).fill(0);
+      const chosen = new Array(TEAM_SIZE);
+
+      for (const chosen7 of combos7) {
+        const pools = chosen7.map(pr => byPr[pr]);
+        if (!canSatisfy(pools, targetBits)) continue;
+        const slotOpts = chosen7.map(pr => prReps[pr]);
+
+        function dfs(slot) {
+          if (slot === TEAM_SIZE) {
+            for (let i = 0; i < n; i++) if (counts[i] < NEED) return;
+            totalValid++;
+            for (let s = 0; s < TEAM_SIZE; s++) {
+              const id = chosen[s].rep.id;
+              personaCount[id] = (personaCount[id] || 0) + 1;
+            }
+            return;
+          }
+          // 枝刈り: 残りスロットで各KWが埋まらないなら打ち切り
+          const rem = TEAM_SIZE - slot;
+          for (let i = 0; i < n; i++) if (counts[i] < NEED && (NEED - counts[i]) > rem) return;
+          for (const opt of slotOpts[slot]) {
+            const b = opt.bits;
+            for (let i = 0; i < n; i++) if (b & kwBits[i]) counts[i]++;
+            chosen[slot] = opt;
+            dfs(slot + 1);
+            for (let i = 0; i < n; i++) if (b & kwBits[i]) counts[i]--;
+          }
+        }
+        dfs(0);
+      }
+
+      // 必須・高採用を分類
+      const required = [], frequent = [];
+      const allPersonas = PERSONAS;
+      for (const [id, cnt] of Object.entries(personaCount)) {
+        const p = allPersonas.find(x => x.id === id);
+        if (!p) continue;
+        if (cnt === totalValid) required.push({ p, count: cnt });
+        else frequent.push({ p, rate: cnt / totalValid, count: cnt });
+      }
+      frequent.sort((a, b) => b.rate - a.rate);
+
+      return { possible: totalValid > 0, totalValid, required, frequent: frequent.slice(0, 10) };
+    }
+
+    let completeResults = {};
+
+    function runComplete() {
+      const kwCount = parseInt(document.getElementById('completeKwCount').value);
+      completeResults = {};
+      const grid = document.getElementById('complete-grid');
+      const status = document.getElementById('complete-status');
+      grid.innerHTML = '<div style="color:var(--c-sub);font-size:13px;padding:8px">探索中...</div>';
+      closeDetail();
+
+      const kwCombos = combinations(ALL_KW, kwCount);
+
+      setTimeout(() => {
+        let possibleCount = 0;
+        const cards = [];
+        for (const kws of kwCombos) {
+          const res = exhaustiveCheck(kws);
+          const key = kws.join('+');
+          completeResults[key] = res;
+          if (res.possible) possibleCount++;
+          cards.push({ kws, res, key });
+        }
+
+        status.textContent = `${kwCombos.length}通り中 ${possibleCount}通りが編成可能`;
+        grid.innerHTML = cards.map(({ kws, res, key }) => {
+          const chips = kws.map(kw =>
+            `<span style="display:inline-block;height:20px;line-height:20px;padding:0 8px;border-radius:4px;font-size:11px;font-weight:700;background:var(--kw-${kw}-bg);color:var(--kw-${kw})">${kw}</span>`
+          ).join('');
+          return `<div class="complete-card ${res.possible ? 'possible' : 'impossible'}" onclick="${res.possible ? `showDetail('${key}')` : ''}">
+            <div class="cc-kws">${chips}</div>
+            <div class="cc-status">${res.possible
+              ? `<span style="color:var(--c-green);font-weight:800">✓ 可</span><span style="font-size:11px;color:var(--c-sub);margin-left:6px">${res.totalValid}通り</span>`
+              : `<span style="color:var(--c-muted);font-weight:700">✗ 不可</span>`
+            }</div>
+          </div>`;
+        }).join('');
+      }, 30);
+    }
+
+    function showDetail(key) {
+      const res = completeResults[key];
+      if (!res || !res.possible) return;
+      const kws = key.split('+');
+      document.getElementById('detail-title').textContent = kws.join(' + ') + ' の編成分析';
+      const { required, frequent, totalValid } = res;
+
+      const renderPersona = (p, label) => {
+        const sc = p.stars === 3 ? 'color:var(--c-amber)' : p.stars === 2 ? 'color:var(--c-sub)' : 'color:var(--c-muted)';
+        const kwChips = p.keywords.map(kw =>
+          `<span style="display:inline-block;height:18px;line-height:18px;padding:0 6px;border-radius:3px;font-size:10px;font-weight:600;background:var(--kw-${kw}-bg);color:var(--kw-${kw})">${kw}</span>`
+        ).join('');
+        return `<div class="p-row" style="padding:8px 20px">
+          <span class="p-prisoner">${p.prisoner}</span>
+          <span class="p-name">${p.name}</span>
+          <span style="font-size:13px;letter-spacing:-2px;${sc};flex-shrink:0;margin-right:8px">${'★'.repeat(p.stars)}</span>
+          <div class="p-kws" style="flex:1">${kwChips || '<span style="font-size:11px;color:var(--c-muted)">なし</span>'}</div>
+          <span style="font-size:11px;color:var(--c-sub);white-space:nowrap;flex-shrink:0">${label}</span>
+        </div>`;
+      };
+
+      let html = '';
+      if (required.length) {
+        html += `<div style="padding:10px 20px 4px;font-size:11px;font-weight:900;color:var(--c-accent);letter-spacing:.1em;text-transform:uppercase">必須 — ${required.length}人格</div>`;
+        html += required.map(({ p }) => renderPersona(p, `全${totalValid}編成で必須`)).join('');
+      }
+      if (frequent.length) {
+        html += `<div style="padding:${required.length ? '14px' : '10px'} 20px 4px;font-size:11px;font-weight:900;color:var(--c-sub);letter-spacing:.1em;text-transform:uppercase">高採用</div>`;
+        html += frequent.map(({ p, rate, count }) =>
+          renderPersona(p, `${Math.round(rate * 100)}% (${count}/${totalValid})`)
+        ).join('');
+      }
+      if (!required.length && !frequent.length) {
+        html = '<div style="padding:20px;color:var(--c-sub);font-size:13px">データなし</div>';
+      }
+
+      document.getElementById('detail-body').innerHTML = html;
+      const detailEl = document.getElementById('complete-detail');
+      detailEl.style.display = 'block';
+      detailEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
+    function closeDetail() {
+      document.getElementById('complete-detail').style.display = 'none';
+    }
+
+    // モーダル外クリック
+    document.getElementById('editModal').addEventListener('click', e => {
+      if (e.target === e.currentTarget) closeModal();
+    });
+  </script>
+</body>
+
+</html>
